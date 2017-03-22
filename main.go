@@ -19,7 +19,7 @@ func main() {
 	fromSHA := os.Getenv("FROM_SHA")
 	toSHA := os.Getenv("TO_SHA")
 
-	repo, err := git.NewGoGitRepository(projectPath, fromSHA, toSHA)
+	repo, err := git.NewGit2GoRepository(projectPath, fromSHA, toSHA)
 	if err != nil {
 		log.Fatalf("Failed to open %s: %s", projectPath, err)
 	}

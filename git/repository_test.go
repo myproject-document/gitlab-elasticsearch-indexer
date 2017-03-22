@@ -45,7 +45,7 @@ func runEachCommit(repo git.Repository) (map[string]*git.Commit, []string, error
 func TestEachCommit(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "", headSHA)
 	assert.NoError(t, err)
 
 	commits, commitHashes, err := runEachCommit(repo)
@@ -118,7 +118,7 @@ func TestEachCommit(t *testing.T) {
 func TestEachCommitGivenRangeOf3Commits(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
 	assert.NoError(t, err)
 
 	_, commitHashes, err := runEachCommit(repo)
@@ -134,7 +134,7 @@ func TestEachCommitGivenRangeOf3Commits(t *testing.T) {
 func TestEachCommitGivenRangeOf2Commits(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
 	assert.NoError(t, err)
 
 	_, commitHashes, err := runEachCommit(repo)
@@ -146,7 +146,7 @@ func TestEachCommitGivenRangeOf2Commits(t *testing.T) {
 func TestEachCommitGivenRangeOf1Commit(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, headSHA, headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, headSHA, headSHA)
 	assert.NoError(t, err)
 
 	_, commitHashes, err := runEachCommit(repo)
@@ -157,7 +157,7 @@ func TestEachCommitGivenRangeOf1Commit(t *testing.T) {
 func TestEmptyToSHADefaultsToHeadSHA(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", "")
+	repo, err := git.NewGit2GoRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", "")
 	assert.NoError(t, err)
 
 	_, commitHashes, err := runEachCommit(repo)
@@ -183,7 +183,7 @@ func runEachFileChange(repo git.Repository) (map[string]*git.File, []string, err
 func TestEachFileChangeMod(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "", headSHA)
 	assert.NoError(t, err)
 
 	files, filePaths, err := runEachFileChange(repo)
@@ -252,7 +252,7 @@ func TestEachFileChangeMod(t *testing.T) {
 func TestEachFileChangeGivenRangeOfThreeCommits(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
 	assert.NoError(t, err)
 
 	_, filePaths, err := runEachFileChange(repo)
@@ -263,7 +263,7 @@ func TestEachFileChangeGivenRangeOfThreeCommits(t *testing.T) {
 func TestEachFileChangeGivenRangeOfTwoCommits(t *testing.T) {
 	checkDeps(t)
 
-	repo, err := git.NewGoGitRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
+	repo, err := git.NewGit2GoRepository(*testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
 	assert.NoError(t, err)
 
 	_, filePaths, err := runEachFileChange(repo)

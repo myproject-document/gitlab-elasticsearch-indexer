@@ -24,6 +24,8 @@ type Indexer struct {
 func (i *Indexer) SubmitCommit(c *git.Commit) error {
 	commit := BuildCommit(c, i.Submitter.ParentID())
 
+	//	log.Print("Submitting commit: ", commit.Hash)
+
 	i.Submitter.Index(commit.ID, map[string]interface{}{"commit": commit})
 	return nil
 }
@@ -38,12 +40,16 @@ func (i *Indexer) SubmitBlob(f *git.File, _, toCommit string) error {
 		return fmt.Errorf("Blob %s: %s", f.Path, err)
 	}
 
+	//	log.Print("Submitting blob: ", f.Path)
+
 	i.Submitter.Index(blob.ID, map[string]interface{}{"blob": blob})
 	return nil
 }
 
 func (i *Indexer) RemoveBlob(file *git.File, _, _ string) error {
 	blobID := GenerateBlobID(i.Submitter.ParentID(), file.Path)
+
+	//	log.Print("Removing blob: ", file.Path)
 
 	i.Submitter.Remove(blobID)
 	return nil
