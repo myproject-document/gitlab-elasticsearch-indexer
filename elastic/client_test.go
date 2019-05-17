@@ -1,8 +1,10 @@
 package elastic_test
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -177,4 +179,27 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	assert.Error(t, err)
 
 	assert.NoError(t, client.DeleteIndex())
+}
+
+func captureOutput(f func()) string {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	f()
+	log.SetOutput(os.Stderr)
+	return buf.String()
+}
+
+func TestBulkProcessorAfterCallback(t *testing.T) {
+	config, err := elastic.ReadConfig(strings.NewReader(`{}`))
+	assert.NoError(t, err)
+
+	client, err := elastic.NewClient(config)
+	assert.NoError(t, err)
+
+	client.Index(projectID, map[string]interface{}{})
+
+	output := captureOutput(func() {
+		client.Flush()
+	})
+	assert.Regexp(t, "elastic", output)
 }

@@ -3,6 +3,7 @@ package elastic
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -94,6 +95,7 @@ func NewClient(config *Config) (*Client, error) {
 	bulk, err := client.BulkProcessor().
 		Workers(BulkWorkers).
 		BulkSize(MaxBulkSize).
+		After(AfterCallback).
 		Do(context.Background())
 
 	if err != nil {
@@ -141,6 +143,12 @@ func (c *Client) Flush() error {
 
 func (c *Client) Close() {
 	c.Client.Stop()
+}
+
+func AfterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func (c *Client) Index(id string, thing interface{}) {
