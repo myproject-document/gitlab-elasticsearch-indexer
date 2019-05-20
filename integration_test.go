@@ -87,7 +87,7 @@ func buildIndex(t *testing.T) (*elastic.Client, func()) {
 	client, err := elastic.FromEnv(projectID)
 	require.NoError(t, err)
 
-	require.NoError(t, client.CreateIndex())
+	require.NoError(t, client.CreateIndex(elastic.IndexMapping))
 
 	return client, func() {
 		client.DeleteIndex()

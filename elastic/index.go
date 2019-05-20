@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var indexMapping = `
+const IndexMapping = `
 {
 	"settings": {
 		"index.mapping.single_type": true,
@@ -372,7 +372,7 @@ var indexMapping = `
 `
 
 // CreateIndex creates an index matching that created by gitlab-elasticsearch-git v1.1.1
-func (c *Client) CreateIndex() error {
+func (c *Client) CreateIndex(indexMapping string) error {
 	info, err := c.Client.NodesInfo().Do(context.Background())
 	if err != nil {
 		return err
