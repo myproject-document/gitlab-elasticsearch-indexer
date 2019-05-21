@@ -2,8 +2,8 @@ package elastic
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -31,10 +31,11 @@ const (
 )
 
 type Client struct {
-	IndexName string
-	ProjectID string
-	Client    *elastic.Client
-	bulk      *elastic.BulkProcessor
+	IndexName         string
+	ProjectID         string
+	errorsEncountered []string
+	Client            *elastic.Client
+	bulk              *elastic.BulkProcessor
 }
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
@@ -57,6 +58,15 @@ func FromEnv(projectID string) (*Client, error) {
 	config.ProjectID = projectID
 
 	return NewClient(config)
+}
+
+func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
+	if err != nil {
+		fmt.Println("Error added")
+		fmt.Println(err)
+		//errMessage := fmt.Sprintf("%d,%s", executionId, err)
+		c.errorsEncountered = append(c.errorsEncountered, err.Error())
+	}
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -92,22 +102,28 @@ func NewClient(config *Config) (*Client, error) {
 		return nil, err
 	}
 
+	errorsEncountered := []string{}
+
+	wrappedClient := &Client{
+		IndexName:         config.IndexName,
+		ProjectID:         config.ProjectID,
+		errorsEncountered: errorsEncountered,
+		Client:            client,
+	}
+
 	bulk, err := client.BulkProcessor().
 		Workers(BulkWorkers).
 		BulkSize(MaxBulkSize).
-		After(AfterCallback).
+		After(wrappedClient.afterCallback).
 		Do(context.Background())
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{
-		IndexName: config.IndexName,
-		ProjectID: config.ProjectID,
-		Client:    client,
-		bulk:      bulk,
-	}, nil
+	wrappedClient.bulk = bulk
+
+	return wrappedClient, nil
 }
 
 // ResolveAWSCredentials returns Credentials object
@@ -138,17 +154,18 @@ func (c *Client) ParentID() string {
 }
 
 func (c *Client) Flush() error {
-	return c.bulk.Flush()
+	err := c.bulk.Flush()
+	if err == nil && len(c.errorsEncountered) > 0 {
+		message := strings.Join(c.errorsEncountered, "\n")
+		fmt.Println(message)
+		err = errors.New(message)
+	}
+
+	return err
 }
 
 func (c *Client) Close() {
 	c.Client.Stop()
-}
-
-func AfterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
-	if err != nil {
-		log.Println(err)
-	}
 }
 
 func (c *Client) Index(id string, thing interface{}) {

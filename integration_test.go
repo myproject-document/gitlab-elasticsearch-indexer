@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"os/exec"
 	"testing"
@@ -80,14 +81,14 @@ func checkDeps(t *testing.T) {
 	}
 }
 
-func buildIndex(t *testing.T) (*elastic.Client, func()) {
+func buildIndex(t *testing.T, indexMapping string) (*elastic.Client, func()) {
 	railsEnv := fmt.Sprintf("test-integration-%d", time.Now().Unix())
 	os.Setenv("RAILS_ENV", railsEnv)
 
 	client, err := elastic.FromEnv(projectID)
 	require.NoError(t, err)
 
-	require.NoError(t, client.CreateIndex(elastic.IndexMapping))
+	require.NoError(t, client.CreateIndex(indexMapping))
 
 	return client, func() {
 		client.DeleteIndex()
@@ -117,7 +118,7 @@ func run(from, to string) error {
 func TestIndexingRemovesFiles(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildIndex(t)
+	c, td := buildIndex(t, elastic.IndexMapping)
 	defer td()
 
 	// The commit before files/empty is removed - so it should be indexed
@@ -142,7 +143,7 @@ type document struct {
 func TestIndexingTranscodesToUTF8(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildIndex(t)
+	c, td := buildIndex(t, elastic.IndexMapping)
 	defer td()
 
 	require.NoError(t, run("", headSHA))
@@ -165,10 +166,204 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 	}
 }
 
+
+const IndexMappingWithMissingFields = `
+{
+	"settings": {
+		"index.mapping.single_type": true,
+		"analysis": {
+			"filter": {
+				"my_stemmer": {
+					"name": "light_english",
+					"type": "stemmer"
+				},
+				"code": {
+					"type": "pattern_capture",
+					"preserve_original": "true",
+					"patterns": [
+						"(\\p{Ll}+|\\p{Lu}\\p{Ll}+|\\p{Lu}+)",
+						"(\\d+)",
+						"(?=([\\p{Lu}]+[\\p{L}]+))",
+						"\"((?:\\\"|[^\"]|\\\")*)\"",
+						"'((?:\\'|[^']|\\')*)'",
+						"\\.([^.]+)(?=\\.|\\s|\\Z)",
+						"\\/?([^\\/]+)(?=\\/|\\b)"
+					]
+				},
+				"edgeNGram_filter": {
+					"type": "edgeNGram",
+					"min_gram": "2",
+					"max_gram": "40"
+				}
+			},
+			"analyzer": {
+				"default": {
+					"filter": [
+						"standard",
+						"lowercase",
+						"my_stemmer"
+					],
+					"tokenizer": "standard"
+				},
+				"code_search_analyzer": {
+					"filter": [
+						"lowercase",
+						"asciifolding"
+					],
+					"type": "custom",
+					"tokenizer": "whitespace"
+				},
+				"path_analyzer": {
+					"filter": [
+						"lowercase",
+						"asciifolding"
+					],
+					"type": "custom",
+					"tokenizer": "path_tokenizer"
+				},
+				"sha_analyzer": {
+					"filter": [
+						"lowercase",
+						"asciifolding"
+					],
+					"type": "custom",
+					"tokenizer": "sha_tokenizer"
+				},
+				"code_analyzer": {
+					"filter": [
+						"code",
+						"lowercase",
+						"asciifolding",
+						"edgeNGram_filter"
+					],
+					"type": "custom",
+					"tokenizer": "whitespace"
+				},
+				"my_ngram_analyzer": {
+					"filter": [
+						"lowercase"
+					],
+					"tokenizer": "my_ngram_tokenizer"
+				}
+			},
+			"tokenizer": {
+				"my_ngram_tokenizer": {
+					"token_chars": [
+						"letter",
+						"digit"
+					],
+					"min_gram": "2",
+					"type": "nGram",
+					"max_gram": "3"
+				},
+				"sha_tokenizer": {
+					"token_chars": [
+						"letter",
+						"digit"
+					],
+					"min_gram": "5",
+					"type": "edgeNGram",
+					"max_gram": "40"
+				},
+				"path_tokenizer": {
+					"reverse": "true",
+					"type": "path_hierarchy"
+				}
+			}
+		}
+	},
+	"mappings": {
+		"doc": {
+			"dynamic": "strict",
+			"_routing": {
+				"required": true
+			},
+			"properties": {
+				"commit": {
+						"dynamic": "strict",
+						"properties": {
+								"author": {
+										"properties": {
+												"email": {
+														"index_options": "offsets",
+														"type": "text"
+												},
+												"name": {
+														"index_options": "offsets",
+														"type": "text"
+												},
+												"time": {
+														"format": "basic_date_time_no_millis",
+														"type": "date"
+												}
+										}
+								},
+								"committer": {
+										"properties": {
+												"email": {
+														"index_options": "offsets",
+														"type": "text"
+												},
+												"name": {
+														"index_options": "offsets",
+														"type": "text"
+												},
+												"time": {
+														"format": "basic_date_time_no_millis",
+														"type": "date"
+												}
+										}
+								},
+								"id": {
+										"analyzer": "sha_analyzer",
+										"index_options": "offsets",
+										"type": "text"
+								},
+								"message": {
+										"index_options": "offsets",
+										"type": "text"
+								},
+								"rid": {
+										"type": "keyword"
+								},
+								"sha": {
+										"analyzer": "sha_analyzer",
+										"index_options": "offsets",
+										"type": "text"
+								},
+								"type": {
+									"type": "keyword"
+								}
+						}
+				}
+			}
+		}
+	}
+}
+`
+
+func TestElasticClientIndexMismatch(t *testing.T) {
+	checkDeps(t)
+	ensureGitalyRepository(t)
+	c, td := buildIndex(t, IndexMappingWithMissingFields)
+	defer td()
+
+	require.NoError(t, run("", headSHA))
+
+	commitDoc := map[string]interface{}{
+		"type": "foo",
+		"text": "bar",
+	}
+	c.Index(projectID+"_0000", commitDoc)
+
+	assert.Error(t, c.Flush())
+
+}
+
 func TestIndexingGitlabTest(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildIndex(t)
+	c, td := buildIndex(t, elastic.IndexMapping)
 	defer td()
 
 	require.NoError(t, run("", headSHA))
