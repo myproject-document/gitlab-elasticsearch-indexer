@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-const IndexMapping = `
+const (
+	IndexMapping = `
 {
 	"settings": {
 		"index.mapping.single_type": true,
@@ -117,7 +118,13 @@ const IndexMapping = `
 			"_routing": {
 				"required": true
 			},
-			"properties": {
+			"properties": __PROPERTIES__
+		}
+	}
+}`
+
+	IndexProperties = `
+			{
 				"archived": {
 						"type": "boolean"
 				},
@@ -366,13 +373,23 @@ const IndexMapping = `
 						"type": "integer"
 				}
 			}
-		}
-	}
-}
 `
+)
 
-// CreateIndex creates an index matching that created by gitlab-elasticsearch-git v1.1.1
-func (c *Client) CreateIndex(indexMapping string) error {
+// CreateIndex creates an index matching that created by gitlab-rails.
+func (c *Client) CreateWorkingIndex() error {
+	mapping := strings.ReplaceAll(IndexMapping, "__PROPERTIES__", IndexProperties)
+
+	return c.createIndex(mapping)
+}
+
+func (c *Client) CreateBrokenIndex() error {
+	mapping := strings.ReplaceAll(IndexMapping, "__PROPERTIES__", "{}")
+
+	return c.createIndex(mapping)
+}
+
+func (c *Client) createIndex(mapping string) error {
 	info, err := c.Client.NodesInfo().Do(context.Background())
 	if err != nil {
 		return err
@@ -383,14 +400,14 @@ func (c *Client) CreateIndex(indexMapping string) error {
 		version, _ := strconv.Atoi(string(node.Version[0]))
 		if version >= 6 {
 			// single_type is an option only available on 5.6 that ES6 cannot handle
-			indexMapping = strings.Replace(indexMapping, "\"index.mapping.single_type\": true,", "", 1)
+			mapping = strings.Replace(mapping, `"index.mapping.single_type": true,`, "", 1)
 		}
 
 		// We only look at the first node and assume they're all the same version
 		break
 	}
 
-	createIndex, err := c.Client.CreateIndex(c.IndexName).BodyString(indexMapping).Do(context.Background())
+	createIndex, err := c.Client.CreateIndex(c.IndexName).BodyString(mapping).Do(context.Background())
 	if err != nil {
 		return err
 	}

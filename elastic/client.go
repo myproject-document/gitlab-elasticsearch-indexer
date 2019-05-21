@@ -61,11 +61,25 @@ func FromEnv(projectID string) (*Client, error) {
 }
 
 func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
+	// FIXME: this is debug code. Remove.
+	fmt.Printf("afterCallback(%d %#v %#v %v)\n", executionId, requests, response, err)
 	if err != nil {
 		fmt.Println("Error added")
 		fmt.Println(err)
 		//errMessage := fmt.Sprintf("%d,%s", executionId, err)
 		c.errorsEncountered = append(c.errorsEncountered, err.Error())
+	}
+
+	if response != nil && response.Errors {
+		numFailed := 0
+		for _, items := range response.Items {
+			for _, item := range items {
+				if item.Error != nil {
+					numFailed = numFailed + 1
+				}
+			}
+		}
+		c.errorsEncountered = append(c.errorsEncountered, fmt.Sprintf("Failed to submit %d documents", numFailed))
 	}
 }
 
