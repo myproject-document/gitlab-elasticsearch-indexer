@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
@@ -31,6 +32,8 @@ type fakeSubmitter struct {
 
 	removed   int
 	removedID []string
+
+	Mapping map[string]map[string]string
 }
 
 type fakeRepository struct {
@@ -59,6 +62,10 @@ func (f *fakeSubmitter) Remove(id string) {
 func (f *fakeSubmitter) Flush() error {
 	f.flushed++
 	return nil
+}
+
+func (f *fakeSubmitter) GetMapping() map[string]map[string]string {
+	return elastic.FallbackMapping()
 }
 
 func (r *fakeRepository) EachFileChange(put git.PutFunc, del git.DelFunc) error {
@@ -146,6 +153,7 @@ func validBlob(file *git.File, content, language string) *indexer.Blob {
 		Path:      file.Path,
 		Filename:  path.Base(file.Path),
 		Language:  language,
+		Mapping:   elastic.FallbackBlobMapping(),
 	}
 }
 
@@ -158,6 +166,7 @@ func validCommit(gitCommit *git.Commit) *indexer.Commit {
 		RepoID:    parentIDString,
 		Message:   gitCommit.Message,
 		SHA:       sha,
+		Mapping:   elastic.FallbackCommitMapping(),
 	}
 }
 
@@ -209,13 +218,13 @@ func TestIndex(t *testing.T) {
 	assert.Equal(t, submit.removed, 1)
 
 	assert.Equal(t, parentIDString+"_"+added.Path, submit.indexedID[0])
-	assert.Equal(t, map[string]interface{}{"project_id": parentID, "blob": added, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[0])
+	assert.Equal(t, map[string]interface{}{"project_id": parentID, "blob": &added, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[0])
 
 	assert.Equal(t, parentIDString+"_"+modified.Path, submit.indexedID[1])
-	assert.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
+	assert.Equal(t, map[string]interface{}{"project_id": parentID, "blob": &modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
 
 	assert.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[2])
-	assert.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[2])
+	assert.Equal(t, map[string]interface{}{"commit": &commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[2])
 
 	assert.Equal(t, parentIDString+"_"+removed.Path, submit.removedID[0])
 

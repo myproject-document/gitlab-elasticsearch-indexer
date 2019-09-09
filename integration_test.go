@@ -113,8 +113,7 @@ func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
 }
 
 func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
-	railsEnv := fmt.Sprintf("test-integration-%d", time.Now().Unix())
-	os.Setenv("RAILS_ENV", railsEnv)
+	setElasticsearchConnectionInfo(t)
 
 	client, err := elastic.FromEnv(projectID)
 	require.NoError(t, err)
@@ -128,6 +127,31 @@ func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 	return client, func() {
 		client.DeleteIndex()
 	}
+}
+
+// Substitude index name and append transform_tables
+func setElasticsearchConnectionInfo(t *testing.T) {
+	var info map[string]*json.RawMessage
+	raw := os.Getenv("ELASTIC_CONNECTION_INFO")
+
+	err := json.Unmarshal([]byte(raw), &info)
+	require.NoError(t, err)
+
+	indexNameAsJson := json.RawMessage(fmt.Sprintf("\"gitlab-test-integration-%d\"", time.Now().Unix()))
+
+	info["index_name"] = &indexNameAsJson
+
+	marshalled, err := json.Marshal(elastic.FallbackMapping())
+	require.NoError(t, err)
+
+	transformTablesAsJson := json.RawMessage(marshalled)
+
+	info["transform_tables"] = &transformTablesAsJson
+
+	newRaw, err := json.Marshal(&info)
+	require.NoError(t, err)
+
+	os.Setenv("ELASTIC_CONNECTION_INFO", string(newRaw))
 }
 
 func run(from, to string, args ...string) (error, string, string) {

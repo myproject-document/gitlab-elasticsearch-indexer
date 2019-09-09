@@ -36,6 +36,7 @@ type Client struct {
 	Client     *elastic.Client
 	bulk       *elastic.BulkProcessor
 	bulkFailed bool
+	Mapping    map[string]map[string]string
 }
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
@@ -48,13 +49,17 @@ func FromEnv(projectID int64) (*Client, error) {
 		return nil, fmt.Errorf("Couldn't parse ELASTIC_CONNECTION_INFO: %s", err)
 	}
 
-	railsEnv := os.Getenv("RAILS_ENV")
-	indexName := "gitlab"
-	if railsEnv != "" {
-		indexName = indexName + "-" + railsEnv
+	if config.IndexName == "" {
+		log.Printf("Deprecation: index_name must be provided in ELASTIC_CONNECTION_INFO in the future.")
+
+		railsEnv := os.Getenv("RAILS_ENV")
+		indexName := "gitlab"
+		if railsEnv != "" {
+			indexName = indexName + "-" + railsEnv
+		}
+		config.IndexName = indexName
 	}
 
-	config.IndexName = indexName
 	config.ProjectID = projectID
 
 	return NewClient(config)
@@ -114,6 +119,7 @@ func NewClient(config *Config) (*Client, error) {
 		IndexName: config.IndexName,
 		ProjectID: config.ProjectID,
 		Client:    client,
+		Mapping:   config.Mapping,
 	}
 
 	bulk, err := client.BulkProcessor().
@@ -181,6 +187,10 @@ func (c *Client) Index(id string, thing interface{}) {
 		Doc(thing)
 
 	c.bulk.Add(req)
+}
+
+func (c *Client) GetMapping() map[string]map[string]string {
+	return c.Mapping
 }
 
 // We only really use this for tests

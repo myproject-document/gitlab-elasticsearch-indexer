@@ -2,9 +2,11 @@ package indexer
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"path"
+	"reflect"
 	"strconv"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
@@ -32,13 +34,13 @@ func isSkipBlobErr(err error) bool {
 }
 
 type Blob struct {
-	Type      string `json:"type"`
-	ID        string `json:"-"`
-	OID       string `json:"oid"`
-	RepoID    string `json:"rid"`
-	CommitSHA string `json:"commit_sha"`
-	Content   string `json:"content"`
-	Path      string `json:"path"`
+	Type      string
+	ID        string
+	OID       string
+	RepoID    string
+	CommitSHA string
+	Content   string
+	Path      string
 
 	// Message copied from gitlab-elasticsearch-git:
 	//
@@ -50,16 +52,18 @@ type Blob struct {
 	//install newest versions
 	//
 	//https://github.com/elastic/elasticsearch-mapper-attachments/issues/124
-	Filename string `json:"file_name"`
+	Filename string
 
-	Language string `json:"language"`
+	Language string
+
+	Mapping map[string]string
 }
 
 func GenerateBlobID(parentID int64, filename string) string {
 	return fmt.Sprintf("%v_%s", parentID, filename)
 }
 
-func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string) (*Blob, error) {
+func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string, mapping map[string]string) (*Blob, error) {
 	if file.Size > git.LimitFileSize {
 		return nil, SkipTooLargeBlob
 	}
@@ -92,6 +96,7 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		Path:      filename,
 		Filename:  path.Base(filename),
 		Language:  DetectLanguage(filename, b),
+		Mapping:   mapping,
 	}
 
 	switch blobType {
@@ -129,4 +134,24 @@ func DetectBinary(data []byte) bool {
 	}
 
 	return bytes.Contains(data[:searchLimit], []byte{0})
+}
+
+func (b *Blob) MarshalJSON() ([]byte, error) {
+	out := map[string]interface{}{}
+
+	s := reflect.ValueOf(b).Elem()
+	typeOfT := s.Type()
+	num := s.NumField()
+
+	for i := 0; i < num; i++ {
+		f := s.Field(i)
+
+		key := typeOfT.Field(i).Name
+		m := b.Mapping
+		if newKey, ok := m[key]; ok {
+			out[newKey] = f.Interface()
+		}
+	}
+
+	return json.Marshal(out)
 }

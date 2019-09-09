@@ -14,6 +14,8 @@ type Submitter interface {
 	Remove(id string)
 
 	Flush() error
+
+	GetMapping() map[string]map[string]string
 }
 
 type Indexer struct {
@@ -22,18 +24,18 @@ type Indexer struct {
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
-	commit := BuildCommit(c, i.Submitter.ParentID())
+	commit := BuildCommit(c, i.Submitter.ParentID(), i.Submitter.GetMapping()["commit"])
 
 	joinData := map[string]string{
 		"name":   "commit",
 		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
 
-	i.Submitter.Index(commit.ID, map[string]interface{}{"commit": commit, "type": "commit", "join_field": joinData})
+	i.Submitter.Index(commit.ID, map[string]interface{}{"commit": &commit, "type": "commit", "join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
-	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob")
+	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob", i.Submitter.GetMapping()["blob"])
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -46,12 +48,12 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 		"name":   "blob",
 		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
 
-	i.Submitter.Index(blob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": blob, "type": "blob", "join_field": joinData})
+	i.Submitter.Index(blob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": &blob, "type": "blob", "join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
-	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob")
+	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob", i.Submitter.GetMapping()["blob"])
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -64,7 +66,7 @@ func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
 		"name":   "wiki_blob",
 		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
 
-	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": wikiBlob, "type": "wiki_blob", "join_field": joinData})
+	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": &wikiBlob, "type": "wiki_blob", "join_field": joinData})
 	return nil
 }
 

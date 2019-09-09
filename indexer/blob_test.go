@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
 
@@ -13,7 +14,7 @@ func TestBuildBlob(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	expected := validBlob(file, "foo", "Text")
 
-	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob")
+	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob", elastic.FallbackBlobMapping())
 	assert.NoError(t, err)
 
 	assert.Equal(t, expected, actual)
@@ -38,7 +39,7 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	file.Size = 1024*1024 + 1
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
 	assert.Error(t, err, indexer.SkipTooLargeBlob)
 	assert.Nil(t, blob)
 }
@@ -46,14 +47,14 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo\x00")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
 	assert.Equal(t, err, indexer.SkipBinaryBlob)
 	assert.Nil(t, blob)
 }
 
 func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 	file := gitFile("Makefile.am", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Makefile", blob.Language)
@@ -61,7 +62,7 @@ func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 	file := gitFile("foo.rb", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Ruby", blob.Language)

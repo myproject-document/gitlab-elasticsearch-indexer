@@ -180,3 +180,41 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 
 	assert.NoError(t, client.DeleteIndex())
 }
+
+func TestElasticClientMapping(t *testing.T) {
+	config, err := elastic.ReadConfig(strings.NewReader(
+		`{
+			"url":["http://elasticsearch:9200"],
+			"transform_tables": {
+				"blob": {
+					"Type": "type",
+					"OID": "oid",
+					"RepoID": "rid"
+				},
+				"commit": {
+					"Type":"type",
+					"Author":"author",
+					"Committer":"committer",
+					"RepoID":"rid",
+					"Message":"message",
+					"SHA":"sha"
+				}
+			},
+			"index_name": "foobar"
+		}`,
+	))
+	assert.NoError(t, err)
+
+	config.ProjectID = 633
+
+	assert.Equal(t, "foobar", config.IndexName)
+
+	blobMapping := config.Mapping["blob"]
+	assert.Equal(t, "type", blobMapping["Type"])
+	assert.Equal(t, "oid", blobMapping["OID"])
+	assert.Equal(t, "rid", blobMapping["RepoID"])
+
+	commitMapping := config.Mapping["commit"]
+	assert.Equal(t, "type", commitMapping["Type"])
+	assert.Equal(t, "author", commitMapping["Author"])
+}

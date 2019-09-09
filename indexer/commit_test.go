@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
 
@@ -13,7 +14,7 @@ func TestBuildCommit(t *testing.T) {
 	gitCommit := gitCommit("Initial commit")
 
 	expected := validCommit(gitCommit)
-	actual := indexer.BuildCommit(gitCommit, parentID)
+	actual := indexer.BuildCommit(gitCommit, parentID, elastic.FallbackCommitMapping())
 
 	assert.Equal(t, expected, actual)
 
