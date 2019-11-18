@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 )
@@ -203,7 +204,7 @@ func TestElasticClientFieldNameTable(t *testing.T) {
 			"index_name": "foobar"
 		}`,
 	))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	config.ProjectID = 633
 
