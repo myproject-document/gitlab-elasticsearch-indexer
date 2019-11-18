@@ -33,7 +33,7 @@ type fakeSubmitter struct {
 	removed   int
 	removedID []string
 
-	Mapping map[string]map[string]string
+	FieldNameTable map[string]map[string]string
 }
 
 type fakeRepository struct {
@@ -64,8 +64,8 @@ func (f *fakeSubmitter) Flush() error {
 	return nil
 }
 
-func (f *fakeSubmitter) GetMapping() map[string]map[string]string {
-	return elastic.FallbackMapping()
+func (f *fakeSubmitter) GetFieldNameTable() map[string]map[string]string {
+	return elastic.FallbackFieldNameTable()
 }
 
 func (r *fakeRepository) EachFileChange(put git.PutFunc, del git.DelFunc) error {
@@ -153,7 +153,8 @@ func validBlob(file *git.File, content, language string) *indexer.Blob {
 		Path:      file.Path,
 		Filename:  path.Base(file.Path),
 		Language:  language,
-		Mapping:   elastic.FallbackBlobMapping(),
+
+		FieldNameTable: elastic.FallbackBlobFieldNameTable(),
 	}
 }
 
@@ -166,7 +167,8 @@ func validCommit(gitCommit *git.Commit) *indexer.Commit {
 		RepoID:    parentIDString,
 		Message:   gitCommit.Message,
 		SHA:       sha,
-		Mapping:   elastic.FallbackCommitMapping(),
+
+		FieldNameTable: elastic.FallbackCommitFieldNameTable(),
 	}
 }
 

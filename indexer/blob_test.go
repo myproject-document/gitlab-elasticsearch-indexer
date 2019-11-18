@@ -14,7 +14,7 @@ func TestBuildBlob(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	expected := validBlob(file, "foo", "Text")
 
-	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob", elastic.FallbackBlobMapping())
+	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob", elastic.FallbackBlobFieldNameTable())
 	assert.NoError(t, err)
 
 	assert.Equal(t, expected, actual)
@@ -39,7 +39,7 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	file.Size = 1024*1024 + 1
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobFieldNameTable())
 	assert.Error(t, err, indexer.SkipTooLargeBlob)
 	assert.Nil(t, blob)
 }
@@ -47,14 +47,14 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo\x00")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobFieldNameTable())
 	assert.Equal(t, err, indexer.SkipBinaryBlob)
 	assert.Nil(t, blob)
 }
 
 func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 	file := gitFile("Makefile.am", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobFieldNameTable())
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Makefile", blob.Language)
@@ -62,7 +62,7 @@ func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 	file := gitFile("foo.rb", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobMapping())
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", elastic.FallbackBlobFieldNameTable())
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Ruby", blob.Language)

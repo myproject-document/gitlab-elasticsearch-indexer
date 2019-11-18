@@ -18,7 +18,7 @@ type Commit struct {
 	Message   string
 	SHA       string
 
-	Mapping map[string]string
+	FieldNameTable map[string]string
 }
 
 func GenerateCommitID(parentID int64, commitSHA string) string {
@@ -36,7 +36,8 @@ func BuildCommit(c *git.Commit, parentID int64, mapping map[string]string) *Comm
 		RepoID:    strconv.FormatInt(parentID, 10),
 		Message:   tryEncodeString(c.Message),
 		SHA:       sha,
-		Mapping:   mapping,
+
+		FieldNameTable: mapping,
 	}
 }
 
@@ -51,7 +52,7 @@ func (c *Commit) MarshalJSON() ([]byte, error) {
 		f := s.Field(i)
 
 		key := typeOfT.Field(i).Name
-		if newKey, ok := c.Mapping[key]; ok {
+		if newKey, ok := c.FieldNameTable[key]; ok {
 			out[newKey] = f.Interface()
 		}
 	}

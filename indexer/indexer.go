@@ -15,7 +15,7 @@ type Submitter interface {
 
 	Flush() error
 
-	GetMapping() map[string]map[string]string
+	GetFieldNameTable() map[string]map[string]string
 }
 
 type Indexer struct {
@@ -24,7 +24,7 @@ type Indexer struct {
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
-	commit := BuildCommit(c, i.Submitter.ParentID(), i.Submitter.GetMapping()["commit"])
+	commit := BuildCommit(c, i.Submitter.ParentID(), i.Submitter.GetFieldNameTable()["commit"])
 
 	joinData := map[string]string{
 		"name":   "commit",
@@ -35,7 +35,7 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 }
 
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
-	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob", i.Submitter.GetMapping()["blob"])
+	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob", i.Submitter.GetFieldNameTable()["blob"])
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -53,7 +53,7 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 }
 
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
-	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob", i.Submitter.GetMapping()["blob"])
+	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob", i.Submitter.GetFieldNameTable()["blob"])
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil

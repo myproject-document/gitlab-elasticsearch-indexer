@@ -56,7 +56,7 @@ type Blob struct {
 
 	Language string
 
-	Mapping map[string]string
+	FieldNameTable map[string]string
 }
 
 func GenerateBlobID(parentID int64, filename string) string {
@@ -96,7 +96,8 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		Path:      filename,
 		Filename:  path.Base(filename),
 		Language:  DetectLanguage(filename, b),
-		Mapping:   mapping,
+
+		FieldNameTable: mapping,
 	}
 
 	switch blobType {
@@ -147,7 +148,7 @@ func (b *Blob) MarshalJSON() ([]byte, error) {
 		f := s.Field(i)
 
 		key := typeOfT.Field(i).Name
-		m := b.Mapping
+		m := b.FieldNameTable
 		if newKey, ok := m[key]; ok {
 			out[newKey] = f.Interface()
 		}

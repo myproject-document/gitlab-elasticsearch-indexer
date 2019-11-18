@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const IndexMapping = `
+const IndexFieldNameTable = `
 {
 	"settings": {
 		"index.mapping.single_type": true,
@@ -407,14 +407,14 @@ func (c *Client) createIndex(mapping string) error {
 
 // CreateIndex creates an index matching that created by gitlab-rails.
 func (c *Client) CreateWorkingIndex() error {
-	mapping := strings.Replace(IndexMapping, "__PROPERTIES__", IndexProperties, -1)
+	mapping := strings.Replace(IndexFieldNameTable, "__PROPERTIES__", IndexProperties, -1)
 
 	return c.createIndex(mapping)
 }
 
 // For testing
 func (c *Client) CreateBrokenIndex() error {
-	mapping := strings.Replace(IndexMapping, "__PROPERTIES__", "{}", -1)
+	mapping := strings.Replace(IndexFieldNameTable, "__PROPERTIES__", "{}", -1)
 
 	return c.createIndex(mapping)
 }

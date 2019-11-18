@@ -14,7 +14,7 @@ type Config struct {
 	AccessKey string   `json:"aws_access_key"`
 	SecretKey string   `json:"aws_secret_access_key"`
 
-	Mapping map[string]map[string]string `json:"transform_tables"`
+	FieldNameTable map[string]map[string]string `json:"transform_tables"`
 }
 
 func ReadConfig(r io.Reader) (*Config, error) {
@@ -25,21 +25,21 @@ func ReadConfig(r io.Reader) (*Config, error) {
 	}
 
 	// Fallback if transform_table is not provided
-	if out.Mapping == nil {
-		out.Mapping = FallbackMapping()
+	if out.FieldNameTable == nil {
+		out.FieldNameTable = FallbackFieldNameTable()
 	}
 
 	return &out, nil
 }
 
-func FallbackMapping() map[string]map[string]string {
+func FallbackFieldNameTable() map[string]map[string]string {
 	return map[string]map[string]string{
-		"blob":   FallbackBlobMapping(),
-		"commit": FallbackCommitMapping(),
+		"blob":   FallbackBlobFieldNameTable(),
+		"commit": FallbackCommitFieldNameTable(),
 	}
 }
 
-func FallbackCommitMapping() map[string]string {
+func FallbackCommitFieldNameTable() map[string]string {
 	return map[string]string{
 		"Type":      "type",
 		"Author":    "author",
@@ -50,7 +50,7 @@ func FallbackCommitMapping() map[string]string {
 	}
 }
 
-func FallbackBlobMapping() map[string]string {
+func FallbackBlobFieldNameTable() map[string]string {
 	return map[string]string{
 		"Type":      "type",
 		"OID":       "oid",

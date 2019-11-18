@@ -141,7 +141,7 @@ func setElasticsearchConnectionInfo(t *testing.T) {
 
 	info["index_name"] = &indexNameAsJson
 
-	marshalled, err := json.Marshal(elastic.FallbackMapping())
+	marshalled, err := json.Marshal(elastic.FallbackFieldNameTable())
 	require.NoError(t, err)
 
 	transformTablesAsJson := json.RawMessage(marshalled)

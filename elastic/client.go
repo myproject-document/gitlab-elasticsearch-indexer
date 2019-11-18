@@ -36,7 +36,8 @@ type Client struct {
 	Client     *elastic.Client
 	bulk       *elastic.BulkProcessor
 	bulkFailed bool
-	Mapping    map[string]map[string]string
+
+	FieldNameTable map[string]map[string]string
 }
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
@@ -119,7 +120,8 @@ func NewClient(config *Config) (*Client, error) {
 		IndexName: config.IndexName,
 		ProjectID: config.ProjectID,
 		Client:    client,
-		Mapping:   config.Mapping,
+
+		FieldNameTable: config.FieldNameTable,
 	}
 
 	bulk, err := client.BulkProcessor().
@@ -189,8 +191,8 @@ func (c *Client) Index(id string, thing interface{}) {
 	c.bulk.Add(req)
 }
 
-func (c *Client) GetMapping() map[string]map[string]string {
-	return c.Mapping
+func (c *Client) GetFieldNameTable() map[string]map[string]string {
+	return c.FieldNameTable
 }
 
 // We only really use this for tests
