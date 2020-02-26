@@ -16,3 +16,5 @@ require (
 	golang.org/x/tools v0.0.0-20200207001614-6fdc5776f4bb
 	google.golang.org/grpc v1.24.0
 )
+
+go 1.12
