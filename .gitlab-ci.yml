@@ -52,18 +52,6 @@
       command: ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && exec /usr/bin/env GITALY_TESTING_NO_GIT_HOOKS=1 /scripts/process-wrapper"]
       alias: gitaly
 
-test 1.11:
-  <<: *test-es6
-  image: golang:1.11
-
-test 1.11-es64:
-  <<: *test-es64
-  image: golang:1.11
-
-test 1.11-es7:
-  <<: *test-es7
-  image: golang:1.11
-
 test 1.12:
   <<: *test-es6
   image: golang:1.12
@@ -75,6 +63,30 @@ test 1.12-es64:
 test 1.12-es7:
   <<: *test-es7
   image: golang:1.12
+
+test 1.13:
+  <<: *test-es6
+  image: golang:1.13
+
+test 1.13-es64:
+  <<: *test-es64
+  image: golang:1.13
+
+test 1.13-es7:
+  <<: *test-es7
+  image: golang:1.13
+
+test 1.14:
+  <<: *test-es6
+  image: golang:1.14
+
+test 1.14-es64:
+  <<: *test-es64
+  image: golang:1.14
+
+test 1.14-es7:
+  <<: *test-es7
+  image: golang:1.14
 
 lint:go-mod:
   image: golang:1.12
