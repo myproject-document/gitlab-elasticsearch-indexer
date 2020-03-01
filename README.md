@@ -50,7 +50,7 @@ docker run -p 8075:8075 registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
 and Elasticsearch:
 
 ```
-docker run -itd -p 9200:9200 elasticsearch:6.1
+docker run -itd -p 9200:9200 elasticsearch:6.8.6
 ```
 
 Before running tests, set configuration variables`
