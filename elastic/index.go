@@ -58,14 +58,6 @@ const IndexMapping = `
 					"type": "custom",
 					"tokenizer": "path_tokenizer"
 				},
-				"sha_analyzer": {
-					"filter": [
-						"lowercase",
-						"asciifolding"
-					],
-					"type": "custom",
-					"tokenizer": "sha_tokenizer"
-				},
 				"code_analyzer": {
 					"filter": [
 						"code",
@@ -93,18 +85,17 @@ const IndexMapping = `
 					"type": "nGram",
 					"max_gram": "3"
 				},
-				"sha_tokenizer": {
-					"token_chars": [
-						"letter",
-						"digit"
-					],
-					"min_gram": "5",
-					"type": "edgeNGram",
-					"max_gram": "40"
-				},
 				"path_tokenizer": {
 					"reverse": "true",
 					"type": "path_hierarchy"
+				}
+			},
+			"normalizer": {
+				"sha_normalizer": {
+				  "filter": [
+					"lowercase"
+				  ],
+				  "type": "custom"
 				}
 			}
 		}
@@ -134,13 +125,13 @@ const IndexProperties = `
 	"blob": {
 		"properties": {
 			"commit_sha": {
-				"analyzer": "sha_analyzer",
-				"index_options": "offsets",
-				"type": "text"
+				"normalizer": "sha_normalizer",
+				"index_options": "docs",
+				"type": "keyword"
 			},
 			"content": {
 				"analyzer": "code_analyzer",
-				"index_options": "offsets",
+				"index_options": "positions",
 				"search_analyzer": "code_search_analyzer",
 				"type": "text"
 			},
@@ -150,17 +141,17 @@ const IndexProperties = `
 				"type": "text"
 			},
 			"id": {
-				"analyzer": "sha_analyzer",
-				"index_options": "offsets",
-				"type": "text"
+				"normalizer": "sha_normalizer",
+				"index_options": "docs",
+				"type": "keyword"
 			},
 			"language": {
 				"type": "keyword"
 			},
 			"oid": {
-				"analyzer": "sha_analyzer",
-				"index_options": "offsets",
-				"type": "text"
+				"normalizer": "sha_normalizer",
+				"index_options": "docs",
+				"type": "keyword"
 			},
 			"path": {
 				"analyzer": "path_analyzer",
@@ -179,11 +170,11 @@ const IndexProperties = `
 			"author": {
 				"properties": {
 					"email": {
-						"index_options": "offsets",
+						"index_options": "docs",
 						"type": "text"
 					},
 					"name": {
-						"index_options": "offsets",
+						"index_options": "docs",
 						"type": "text"
 					},
 					"time": {
@@ -195,11 +186,11 @@ const IndexProperties = `
 			"committer": {
 				"properties": {
 					"email": {
-						"index_options": "offsets",
+						"index_options": "docs",
 						"type": "text"
 					},
 					"name": {
-						"index_options": "offsets",
+						"index_options": "docs",
 						"type": "text"
 					},
 					"time": {
@@ -209,21 +200,21 @@ const IndexProperties = `
 				}
 			},
 			"id": {
-				"analyzer": "sha_analyzer",
-				"index_options": "offsets",
-				"type": "text"
+				"normalizer": "sha_normalizer",
+				"index_options": "docs",
+				"type": "keyword"
 			},
 			"message": {
-				"index_options": "offsets",
+				"index_options": "positions",
 				"type": "text"
 			},
 			"rid": {
 				"type": "keyword"
 			},
 			"sha": {
-				"analyzer": "sha_analyzer",
-				"index_options": "offsets",
-				"type": "text"
+				"normalizer": "sha_normalizer",
+				"index_options": "docs",
+				"type": "keyword"
 			},
 			"type": {
 				"type": "keyword"
