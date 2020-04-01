@@ -41,40 +41,74 @@ PREFIX=/usr sudo -E make install
 
 ## Run tests
 
-Test suite expects Gitaly and Elasticsearch to be run. You can run it with docker:
+Test suite expects Gitaly and Elasticsearch to be run, on the following ports:
 
-```
-docker run -p 8075:8075 registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
-```
+  - Gitaly: 8075
+  - ElasticSearch v6.8.6: 9201
 
-and Elasticsearch:
+### Quick tests
 
-```
-docker run -itd -p 9200:9200 elasticsearch:6.8.6
-```
+```bash
+# you only have to run this once, as it starts the services
+make test-infra
 
-Before running tests, set configuration variables`
+# source the default connections
+source .env.test
 
-```
-export GITALY_CONNECTION_INFO='{"address": "tcp://localhost:8075", "storage": "default"}'
-export ELASTIC_CONNECTION_INFO='{"url":["http://localhost:9200"], "index_name":"gitlab-test"}'
-```
-**Note**: If using a socket, please pass your URI in the form `unix://FULL_PATH_WITH_LEADING_SLASH`
-Example:
-```
-export GITALY_CONNECTION_INFO='{"address": "unix:///gitlab/gdk/gitaly.socket", "storage": "default"}'
-```
-
-to run some specific test, run
-
-```
-go test -v gitlab.com/gitlab-org/gitlab-elasticsearch-indexer -run TestIndexingGitlabTest
-```
-
-to run the whole test suite
-
-```
+# run the test suite
 make test
+
+# or run a specific test
+go test -v gitlab.com/gitlab-org/gitlab-elasticsearch-indexer -run TestIndexingGitlabTest
+
+```
+
+If you want to re-create the infra, you can run `make test-infra` again.
+
+### Custom tests
+
+If you want to test a particular setup, for instance:
+
+  - You want to run on a local Gitaly instance, as the one from the GDK
+  - You want to use a specific ElasticSearch cluster, as the one from the GDK
+  
+Then you'll have to manually set the proper tests connections.
+
+First, start the services that you need (`gitlab`, `elasticsearch`), with using `docker-compose up <service> -d`
+
+
+```bash
+# to start Gitaly
+docker-compose up gitaly -d
+
+# to start ElasticSearch
+docker-compose up elasticsearch -d
+```
+
+Before running tests, set configuration variables
+
+```bash
+# these are the defaults, in `.env.test`
+
+export GITALY_CONNECTION_INFO='{"address": "tcp://localhost:8075", "storage": "default"}'
+export ELASTIC_CONNECTION_INFO='{"url":["http://localhost:9201"], "index_name":"gitlab-test"}'
+```
+
+**Note**: If using a socket, please pass your URI in the form `unix://FULL_PATH_WITH_LEADING_SLASH`
+
+Example:
+```bash
+# source the default connections
+source .env.test
+
+# override the Gitaly connection
+export GITALY_CONNECTION_INFO='{"address": "unix:///gitlab/gdk/gitaly.socket", "storage": "default"}'
+
+# run the test suite
+make test
+
+# or a specific test
+go test -v gitlab.com/gitlab-org/gitlab-elasticsearch-indexer -run TestIndexingGitlabTest
 ```
 
 ## Contributing

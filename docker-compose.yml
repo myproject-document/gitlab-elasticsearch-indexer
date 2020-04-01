@@ -1,0 +1,11 @@
+version: '3.1'
+services:
+  gitaly:
+    image: registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
+    ports:
+      - '8075:8075'
+
+  elasticsearch:
+    image: elasticsearch:6.8.6
+    ports:
+      - '9201:9200'

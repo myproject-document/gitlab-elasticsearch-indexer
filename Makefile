@@ -36,6 +36,11 @@ signed_tag:
 	$(call message,$@)
 	TAG_OPTS=-s sh _support/tag.sh
 
+.PHONY: test-infra
+test-infra:
+	$Q docker-compose down
+	$Q docker-compose up -d
+
 test:
 	# install -race libs to speed up next run
 	$Q $(GO) test $(if $V,-v) -i -race $(GO_PACKAGES)
