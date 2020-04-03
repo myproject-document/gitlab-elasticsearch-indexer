@@ -101,3 +101,16 @@ lint:go-mod:
         echo "Running go mod tidy modified go.mod and/or go.sum"
         exit 1
       fi
+      
+code_navigation:
+  image: registry.gitlab.com/gitlab-org/gitlab-build-images:ruby-2.6-golang-1.14-git-2.24
+  allow_failure: true
+  script:
+    - go get github.com/sourcegraph/lsif-go/cmd/lsif-go
+    - gem install lsif_parser
+    - ~/go/bin/lsif-go
+    - lsif_parser dump.lsif $PWD
+    - mv dump.lsif.tmp lsif
+  artifacts:
+    paths:
+      - lsif/
