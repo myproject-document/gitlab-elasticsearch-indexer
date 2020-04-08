@@ -5,14 +5,14 @@ require (
 	github.com/deoxxa/aws_signing_client v0.0.0-20161109131055-c20ee106809e
 	github.com/fortytw2/leaktest v1.3.0 // indirect
 	github.com/gogo/protobuf v1.2.1 // indirect
-	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/mailru/easyjson v0.0.0-20190403194419-1ea4449da983 // indirect
 	github.com/olivere/elastic v6.2.24+incompatible
 	github.com/sirupsen/logrus v1.4.1
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	gitlab.com/gitlab-org/gitaly v1.68.0
+	gitlab.com/gitlab-org/labkit v0.0.0-20200327153541-fac94cb428e6
 	gitlab.com/lupine/icu v1.0.0
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
+	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/tools v0.0.0-20200207001614-6fdc5776f4bb
 	google.golang.org/grpc v1.24.0
 )
