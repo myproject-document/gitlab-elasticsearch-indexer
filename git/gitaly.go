@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,13 +13,14 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	gitalyauth "gitlab.com/gitlab-org/gitaly/auth"
 	gitalyclient "gitlab.com/gitlab-org/gitaly/client"
 	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"gitlab.com/gitlab-org/labkit/correlation"
+	grpccorrelation "gitlab.com/gitlab-org/labkit/correlation/grpc"
 )
 
 const SubmoduleFileMode = 0160000
@@ -27,6 +29,8 @@ const LimitFileSize = 1024 * 1024
 // See https://stackoverflow.com/questions/9765453/is-gits-semi-secret-empty-tree-object-reliable-and-why-is-there-not-a-symbolic
 const NullTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 const ZeroSHA = "0000000000000000000000000000000000000000"
+
+const envCorrelationIDKey = "CORRELATION_ID"
 
 type StorageConfig struct {
 	Address      string `json:"address"`
@@ -43,9 +47,9 @@ type gitalyClient struct {
 	repositoryServiceClient pb.RepositoryServiceClient
 	refServiceClient        pb.RefServiceClient
 	commitServiceClient     pb.CommitServiceClient
-
-	FromHash string
-	ToHash   string
+	ctx                     context.Context
+	FromHash                string
+	ToHash                  string
 }
 
 func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClient, error) {
@@ -59,7 +63,8 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 	connOpts := append(
 		gitalyclient.DefaultDialOpts,
 		grpc.WithPerRPCCredentials(RPCCred),
-	)
+		grpc.WithStreamInterceptor(grpccorrelation.StreamClientCorrelationInterceptor()),
+		grpc.WithUnaryInterceptor(grpccorrelation.UnaryClientCorrelationInterceptor()))
 
 	conn, err := gitalyclient.Dial(config.Address, connOpts)
 	if err != nil {
@@ -71,6 +76,11 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 		RelativePath: config.RelativePath,
 	}
 
+	ctx, err := newContext()
+	if err != nil {
+		return nil, err
+	}
+
 	client := &gitalyClient{
 		conn:                    conn,
 		repository:              repository,
@@ -78,6 +88,7 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 		repositoryServiceClient: pb.NewRepositoryServiceClient(conn),
 		refServiceClient:        pb.NewRefServiceClient(conn),
 		commitServiceClient:     pb.NewCommitServiceClient(conn),
+		ctx:                     ctx,
 	}
 
 	if fromSHA == "" || fromSHA == ZeroSHA {
@@ -127,7 +138,7 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 		ToRevision:   gc.ToHash,
 	}
 
-	stream, err := gc.repositoryServiceClient.GetRawChanges(context.Background(), request)
+	stream, err := gc.repositoryServiceClient.GetRawChanges(gc.ctx, request)
 	if err != nil {
 		return fmt.Errorf("could not call rpc.GetRawChanges: %v", err)
 	}
@@ -186,7 +197,7 @@ func (gc *gitalyClient) lookUpHEAD() (string, error) {
 		Revision:   defaultBranchName,
 	}
 
-	response, err := gc.commitServiceClient.FindCommit(context.Background(), request)
+	response, err := gc.commitServiceClient.FindCommit(gc.ctx, request)
 	if err != nil {
 		return "", fmt.Errorf("Cannot look up HEAD: %v", err)
 	}
@@ -198,7 +209,7 @@ func (gc *gitalyClient) findDefaultBranchName() ([]byte, error) {
 		Repository: gc.repository,
 	}
 
-	response, err := gc.refServiceClient.FindDefaultBranchName(context.Background(), request)
+	response, err := gc.refServiceClient.FindDefaultBranchName(gc.ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot find a default branch: %v", err)
 	}
@@ -214,7 +225,7 @@ func (gc *gitalyClient) getBlob(oid string) (io.ReadCloser, error) {
 		Limit:      LimitFileSize,
 	}
 
-	stream, err := gc.blobServiceClient.GetBlob(context.Background(), request)
+	stream, err := gc.blobServiceClient.GetBlob(gc.ctx, request)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot get blob: %s", oid)
 	}
@@ -269,7 +280,7 @@ func (gc *gitalyClient) EachCommit(f CommitFunc) error {
 		To:         []byte(gc.ToHash),
 	}
 
-	stream, err := gc.commitServiceClient.CommitsBetween(context.Background(), request)
+	stream, err := gc.commitServiceClient.CommitsBetween(gc.ctx, request)
 	if err != nil {
 		return fmt.Errorf("could not call rpc.CommitsBetween: %v", err)
 	}
@@ -306,4 +317,27 @@ func gitalyBuildSignature(ca *pb.CommitAuthor) Signature {
 		Email: string(ca.Email),
 		When:  time.Unix(ca.Date.GetSeconds(), 0), // another option is ptypes.Timestamp(ca.Date)
 	}
+}
+
+func generateCorrelationID() (string, error) {
+	var err error
+
+	cid := os.Getenv(envCorrelationIDKey)
+	if cid == "" {
+		if cid, err = correlation.RandomID(); err != nil {
+			log.Error("Unable to generate random correlation ID: ", err)
+			return "", err
+		}
+	}
+
+	return cid, nil
+}
+
+func newContext() (context.Context, error) {
+	//TODO: we need to put client name in the context
+	cid, err := generateCorrelationID()
+	if err != nil {
+		return nil, err
+	}
+	return correlation.ContextWithCorrelation(context.Background(), cid), nil
 }
