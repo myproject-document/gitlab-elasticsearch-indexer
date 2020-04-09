@@ -64,7 +64,13 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 		gitalyclient.DefaultDialOpts,
 		grpc.WithPerRPCCredentials(RPCCred),
 		grpc.WithStreamInterceptor(grpccorrelation.StreamClientCorrelationInterceptor()),
-		grpc.WithUnaryInterceptor(grpccorrelation.UnaryClientCorrelationInterceptor()))
+		grpc.WithUnaryInterceptor(grpccorrelation.UnaryClientCorrelationInterceptor()),
+	)
+
+	ctx, err := newContext()
+	if err != nil {
+		return nil, err
+	}
 
 	conn, err := gitalyclient.Dial(config.Address, connOpts)
 	if err != nil {
@@ -74,11 +80,6 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 	repository := &pb.Repository{
 		StorageName:  config.StorageName,
 		RelativePath: config.RelativePath,
-	}
-
-	ctx, err := newContext()
-	if err != nil {
-		return nil, err
 	}
 
 	client := &gitalyClient{
