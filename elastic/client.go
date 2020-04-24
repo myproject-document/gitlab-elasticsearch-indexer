@@ -23,11 +23,12 @@ var (
 )
 
 type Client struct {
-	IndexName  string
-	ProjectID  int64
-	Client     *elastic.Client
-	bulk       *elastic.BulkProcessor
-	bulkFailed bool
+	IndexName   string
+	ProjectID   int64
+	maxBulkSize int
+	Client      *elastic.Client
+	bulk        *elastic.BulkProcessor
+	bulkFailed  bool
 }
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
@@ -57,7 +58,12 @@ func FromEnv(projectID int64) (*Client, error) {
 func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
 	if err != nil {
 		c.bulkFailed = true
-		log.Printf("bulk request %v: error: %v", executionId, err)
+
+		if elastic.IsStatusCode(err, http.StatusRequestEntityTooLarge) {
+			log.Printf("bulk request %d: error: %v, max bulk size setting (GitLab): %d bytes. Consider lowering maximum bulk request size or/and increasing http.max_content_length", executionId, err, c.maxBulkSize)
+		} else {
+			log.Printf("bulk request %d: error: %v", executionId, err)
+		}
 	}
 
 	// bulk response can be nil in some cases, we must check first
@@ -67,7 +73,7 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 			c.bulkFailed = true
 			total := numFailed + len(response.Succeeded())
 
-			log.Printf("bulk request %v: failed to insert %v/%v documents ", executionId, numFailed, total)
+			log.Printf("bulk request %d: failed to insert %d/%d documents ", executionId, numFailed, total)
 		}
 	}
 }
@@ -106,9 +112,10 @@ func NewClient(config *Config) (*Client, error) {
 	}
 
 	wrappedClient := &Client{
-		IndexName: config.IndexName,
-		ProjectID: config.ProjectID,
-		Client:    client,
+		IndexName:   config.IndexName,
+		ProjectID:   config.ProjectID,
+		maxBulkSize: config.MaxBulkSize,
+		Client:      client,
 	}
 
 	bulk, err := client.BulkProcessor().
