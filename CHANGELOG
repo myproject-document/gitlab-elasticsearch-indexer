@@ -1,5 +1,10 @@
 # GitLab Elasticsearch Indexer
 
+## v2.3.0
+
+- Process status 413 Request Entity Too Large !65
+- Set client name in Gitaly GPRC calls !72
+
 ## v2.2.0
 
 - Add Correlation ID when making request to Gitaly !63
