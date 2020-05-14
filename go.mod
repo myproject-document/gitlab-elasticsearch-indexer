@@ -10,7 +10,7 @@ require (
 	github.com/sirupsen/logrus v1.4.1
 	github.com/stretchr/testify v1.4.0
 	gitlab.com/gitlab-org/gitaly v1.68.0
-	gitlab.com/gitlab-org/labkit v0.0.0-20200327153541-fac94cb428e6
+	gitlab.com/gitlab-org/labkit v0.0.0-20200507062444-0149780c759d
 	gitlab.com/lupine/icu v1.0.0
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
 	golang.org/x/tools v0.0.0-20200207001614-6fdc5776f4bb
