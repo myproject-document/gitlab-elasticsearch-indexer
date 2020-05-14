@@ -23,14 +23,16 @@ import (
 	grpccorrelation "gitlab.com/gitlab-org/labkit/correlation/grpc"
 )
 
-const SubmoduleFileMode = 0160000
-const LimitFileSize = 1024 * 1024
+const (
+	SubmoduleFileMode = 0160000
+	LimitFileSize     = 1024 * 1024
+	// See https://stackoverflow.com/questions/9765453/is-gits-semi-secret-empty-tree-object-reliable-and-why-is-there-not-a-symbolic
+	NullTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+	ZeroSHA     = "0000000000000000000000000000000000000000"
 
-// See https://stackoverflow.com/questions/9765453/is-gits-semi-secret-empty-tree-object-reliable-and-why-is-there-not-a-symbolic
-const NullTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-const ZeroSHA = "0000000000000000000000000000000000000000"
-
-const envCorrelationIDKey = "CORRELATION_ID"
+	envCorrelationIDKey = "CORRELATION_ID"
+	clientName          = "gitlab-elasticsearch-indexer"
+)
 
 type StorageConfig struct {
 	Address      string `json:"address"`
@@ -63,8 +65,16 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 	connOpts := append(
 		gitalyclient.DefaultDialOpts,
 		grpc.WithPerRPCCredentials(RPCCred),
-		grpc.WithStreamInterceptor(grpccorrelation.StreamClientCorrelationInterceptor()),
-		grpc.WithUnaryInterceptor(grpccorrelation.UnaryClientCorrelationInterceptor()),
+		grpc.WithStreamInterceptor(
+			grpccorrelation.StreamClientCorrelationInterceptor(
+				grpccorrelation.WithClientName(clientName),
+			),
+		),
+		grpc.WithUnaryInterceptor(
+			grpccorrelation.UnaryClientCorrelationInterceptor(
+				grpccorrelation.WithClientName(clientName),
+			),
+		),
 	)
 
 	ctx, err := newContext()
@@ -335,7 +345,6 @@ func generateCorrelationID() (string, error) {
 }
 
 func newContext() (context.Context, error) {
-	//TODO: we need to put client name in the context
 	cid, err := generateCorrelationID()
 	if err != nil {
 		return nil, err
