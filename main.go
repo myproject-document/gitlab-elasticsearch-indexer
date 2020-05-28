@@ -53,18 +53,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	esClient, err := elastic.FromEnv(projectID)
+	esClient, err := elastic.FromEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	idx := &indexer.Indexer{
+		ProjectID: indexer.ProjectID(projectID),
 		Submitter:  esClient,
 		Repository: repo,
 	}
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
-	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", esClient.IndexName, esClient.ParentID(), blobType, skipCommits)
+	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", esClient.IndexName, projectID, blobType, skipCommits)
 
 	if err := idx.IndexBlobs(blobType); err != nil {
 		log.Fatalln("Indexing error: ", err)

@@ -41,10 +41,6 @@ type fakeRepository struct {
 	removed  []*git.File
 }
 
-func (f *fakeSubmitter) ParentID() int64 {
-	return parentID
-}
-
 func (f *fakeSubmitter) Index(id string, thing interface{}) {
 	f.indexed++
 	f.indexedID = append(f.indexedID, id)

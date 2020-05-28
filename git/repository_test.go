@@ -49,7 +49,6 @@ func ensureGitalyRepository(t *testing.T) error {
 	}
 
 	namespace := pb.NewNamespaceServiceClient(conn)
-
 	repository := pb.NewRepositoryServiceClient(conn)
 
 	// Remove the repository if it already exists, for consistency
@@ -163,7 +162,6 @@ func TestEachCommit(t *testing.T) {
 	require.Equal(t, expectedCommits, commitHashes)
 
 	// Now choose one commit and check it in detail
-
 	commit := commits[initialSHA]
 	date, err := time.Parse("Mon Jan 02 15:04:05 2006 -0700", "Thu Feb 27 10:03:18 2014 +0200")
 	require.NoError(t, err)
@@ -232,6 +230,11 @@ func TestEmptyToSHADefaultsToHeadSHA(t *testing.T) {
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
 	require.Equal(t, []string{headSHA}, commitHashes)
+}
+
+func TestEachCommitGivenASandwichRange(t *testing.T) {
+	checkDeps(t)
+	require.NoError(t, ensureGitalyRepository(t))
 }
 
 func runEachFileChange(repo git.Repository) (map[string]*git.File, []string, []string, error) {

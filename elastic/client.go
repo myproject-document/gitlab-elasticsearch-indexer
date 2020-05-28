@@ -22,18 +22,26 @@ var (
 	timeoutError = fmt.Errorf("Timeout")
 )
 
+type Ref interface {
+	Ref() string
+}
+
+type DocumentRef interface {
+	Ref
+	RoutingRef() string
+}
+
 type Client struct {
 	IndexName   string
-	ProjectID   int64
-	maxBulkSize int
 	Client      *elastic.Client
 	bulk        *elastic.BulkProcessor
+	maxBulkSize int
 	bulkFailed  bool
 }
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
 // environment variable
-func FromEnv(projectID int64) (*Client, error) {
+func FromEnv() (*Client, error) {
 	data := strings.NewReader(os.Getenv("ELASTIC_CONNECTION_INFO"))
 
 	config, err := ReadConfig(data)
@@ -49,8 +57,6 @@ func FromEnv(projectID int64) (*Client, error) {
 		}
 		config.IndexName = indexName
 	}
-
-	config.ProjectID = projectID
 
 	return NewClient(config)
 }
@@ -113,7 +119,6 @@ func NewClient(config *Config) (*Client, error) {
 
 	wrappedClient := &Client{
 		IndexName:   config.IndexName,
-		ProjectID:   config.ProjectID,
 		maxBulkSize: config.MaxBulkSize,
 		Client:      client,
 	}
@@ -156,10 +161,6 @@ func ResolveAWSCredentials(config *Config, aws_config *aws.Config) *credentials.
 	return creds
 }
 
-func (c *Client) ParentID() int64 {
-	return c.ProjectID
-}
-
 func (c *Client) Flush() error {
 	err := c.bulk.Flush()
 
@@ -174,41 +175,45 @@ func (c *Client) Close() {
 	c.Client.Stop()
 }
 
-func (c *Client) Index(id string, thing interface{}) {
+func (c *Client) Index(id DocumentRef, thing interface{}) {
 	req := elastic.NewBulkIndexRequest().
 		Index(c.IndexName).
 		Type("doc").
-		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
-		Id(id).
+	  Routing(id.RoutingRef()).
+		Id(id.Ref()).
 		Doc(thing)
 
 	c.bulk.Add(req)
 }
 
 // We only really use this for tests
-func (c *Client) Get(id string) (*elastic.GetResult, error) {
+func (c *Client) Get(id DocumentRef) (*elastic.GetResult, error) {
 	return c.Client.Get().
 		Index(c.IndexName).
 		Type("doc").
-		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
-		Id(id).
+		Routing(id.RoutingRef()).
+		Id(id.Ref()).
 		Do(context.TODO())
 }
 
-func (c *Client) GetCommit(id string) (*elastic.GetResult, error) {
+/*
+// TODO: Use DocumentRef instead
+func (c *Client) GetCommit(id CommitID) (*elastic.GetResult, error) {
 	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, id))
 }
 
+// TODO: Use DocumentRef instead
 func (c *Client) GetBlob(path string) (*elastic.GetResult, error) {
 	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, path))
 }
+*/
 
-func (c *Client) Remove(id string) {
+func (c *Client) Remove(id DocumentRef) {
 	req := elastic.NewBulkDeleteRequest().
 		Index(c.IndexName).
 		Type("doc").
-		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
-		Id(id)
+	  Routing(id.RoutingRef()).
+		Id(id.Ref())
 
 	c.bulk.Add(req)
 }

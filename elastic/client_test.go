@@ -148,10 +148,8 @@ func setupTestClient(t *testing.T) *elastic.Client {
 
 	os.Setenv("RAILS_ENV", fmt.Sprintf("test-elastic-%d", time.Now().Unix()))
 
-	client, err := elastic.FromEnv(projectID)
+	client, err := elastic.FromEnv()
 	require.NoError(t, err)
-
-	require.Equal(t, projectID, client.ParentID())
 
 	return client
 }

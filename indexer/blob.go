@@ -32,13 +32,13 @@ func isSkipBlobErr(err error) bool {
 }
 
 type Blob struct {
-	Type      string `json:"type"`
-	ID        string `json:"-"`
-	OID       string `json:"oid"`
-	RepoID    string `json:"rid"`
-	CommitSHA string `json:"commit_sha"`
-	Content   string `json:"content"`
-	Path      string `json:"path"`
+	ID        *BlobID  `json:"-"`
+	Type      string	 `json:"type"`
+	OID       string	 `json:"oid"`
+	RepoID    string	 `json:"rid"`
+	CommitSHA string	 `json:"commit_sha"`
+	Content   string	 `json:"content"`
+	Path      string	 `json:"path"`
 
 	// Message copied from gitlab-elasticsearch-git:
 	//
@@ -50,16 +50,11 @@ type Blob struct {
 	//install newest versions
 	//
 	//https://github.com/elastic/elasticsearch-mapper-attachments/issues/124
-	Filename string `json:"file_name"`
-
-	Language string `json:"language"`
+	Filename string				`json:"file_name"`
+	Language string				`json:"language"`
 }
 
-func GenerateBlobID(parentID int64, filename string) string {
-	return fmt.Sprintf("%v_%s", parentID, filename)
-}
-
-func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string) (*Blob, error) {
+func BuildBlob(file *git.File, commitID CommitID, blobType string) (*Blob, error) {
 	if file.Size > git.LimitFileSize {
 		return nil, SkipTooLargeBlob
 	}
@@ -73,6 +68,10 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 
 	// FIXME(nick): This doesn't look cheap. Check the RAM & CPU pressure, esp.
 	// for large blobs
+  //
+	// We could alternatively read _N_ bytes then try to do the binary
+	// detection, like CharlockHolmes does in Ruby and try to bail out
+	// if the blob is binary, or read the rest of the file.
 	b, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, err
@@ -82,12 +81,12 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		return nil, SkipBinaryBlob
 	}
 
-	content := tryEncodeBytes(b)
 	filename := tryEncodeString(file.Path)
+	content := tryEncodeBytes(b)
 	blob := &Blob{
-		ID:        GenerateBlobID(parentID, filename),
+		ID:        &BlobID{ commitID.ProjectID, filename },
 		OID:       file.Oid,
-		CommitSHA: commitSHA,
+		CommitSHA: commitID.SHA,
 		Content:   content,
 		Path:      filename,
 		Filename:  path.Base(filename),
@@ -97,10 +96,10 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 	switch blobType {
 	case "blob":
 		blob.Type = "blob"
-		blob.RepoID = strconv.FormatInt(parentID, 10)
+		blob.RepoID = strconv.FormatInt(int64(commitID.ProjectID), 10)
 	case "wiki_blob":
 		blob.Type = "wiki_blob"
-		blob.RepoID = fmt.Sprintf("wiki_%d", parentID)
+		blob.RepoID = fmt.Sprintf("wiki_%d", commitID.ProjectID)
 	}
 
 	return blob, nil

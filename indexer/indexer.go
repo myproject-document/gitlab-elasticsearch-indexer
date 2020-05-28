@@ -5,35 +5,68 @@ import (
 	"log"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 )
 
 type Submitter interface {
-	ParentID() int64
-
-	Index(id string, thing interface{})
-	Remove(id string)
+	Index(id elastic.DocumentRef, thing interface{})
+	Remove(id elastic.DocumentRef)
 
 	Flush() error
 }
 
+type ProjectID int64
+
+func (p *ProjectID) Ref() string {
+	return fmt.Sprintf("project_%v", p)
+}
+
+type CommitID struct {
+	ProjectID
+	SHA string
+}
+
+func (c *CommitID) Ref() string {
+	return fmt.Sprintf("%v_%d", c.ProjectID, c.SHA)
+}
+
+func (c *CommitID) RoutingRef() string {
+	return c.ProjectID.Ref()
+}
+
+type BlobID struct {
+	ProjectID
+	FilePath string
+}
+
+func (b *BlobID) Ref() string {
+	return fmt.Sprintf("%v_%d", b.ProjectID, b.FilePath)
+}
+
+func (b *BlobID) RoutingRef() string {
+	return b.ProjectID.Ref()
+}
+
 type Indexer struct {
+	ProjectID
 	git.Repository
 	Submitter
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
-	commit := BuildCommit(c, i.Submitter.ParentID())
+	commit := BuildCommit(c, i.ProjectID)
 
 	joinData := map[string]string{
 		"name":   "commit",
-		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
+		"parent": i.ProjectID.Ref()}
 
 	i.Submitter.Index(commit.ID, map[string]interface{}{"commit": commit, "type": "commit", "join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
-	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob")
+	commitID := CommitID{ i.ProjectID, toCommit }
+	blob, err := BuildBlob(f, commitID, "blob")
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -44,14 +77,15 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 
 	joinData := map[string]string{
 		"name":   "blob",
-		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
+		"parent": i.ProjectID.Ref()}
 
-	i.Submitter.Index(blob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": blob, "type": "blob", "join_field": joinData})
+	i.Submitter.Index(blob.ID, map[string]interface{}{"project_id": i.ProjectID, "blob": blob, "type": "blob", "join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
-	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob")
+	commitID := CommitID{ i.ProjectID, toCommit }
+	wikiBlob, err := BuildBlob(f, commitID, "wiki_blob")
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -62,16 +96,20 @@ func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
 
 	joinData := map[string]string{
 		"name":   "wiki_blob",
-		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
+		"parent": i.ProjectID.Ref()}
 
-	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": wikiBlob, "type": "wiki_blob", "join_field": joinData})
+	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{
+		"project_id": i.ProjectID,
+		"blob": wikiBlob,
+		"type": "wiki_blob",
+		"join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) removeBlob(path string) error {
-	blobID := GenerateBlobID(i.Submitter.ParentID(), path)
+	blobID := BlobID{ i.ProjectID, path }
 
-	i.Submitter.Remove(blobID)
+	i.Submitter.Remove(&blobID)
 	return nil
 }
 
