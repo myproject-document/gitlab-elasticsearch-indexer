@@ -162,6 +162,7 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 		if err != nil {
 			return fmt.Errorf("%v.GetRawChanges, %v", c, err)
 		}
+
 		for _, change := range c.RawChanges {
 			// TODO: We just skip submodules from indexing now just to mirror the go-git
 			// implementation but it can be not that expensive to implement with gitaly actually so some
@@ -173,7 +174,7 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 			switch change.Operation.String() {
 			case "DELETED", "RENAMED":
 				path := string(change.OldPath)
-				log.Debug("Indexing blob change: ", "DELETE", path)
+				log.Debug("Blob removed: ", path)
 				if err = del(path); err != nil {
 					return err
 				}
@@ -185,13 +186,14 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 				if err != nil {
 					return err
 				}
-				log.Debug("Indexing blob change: ", "PUT", file.Path)
+				log.Debug("Blob indexed: ", file.Path)
 				if err = put(file, gc.FromHash, gc.ToHash); err != nil {
 					return err
 				}
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -312,7 +314,7 @@ func (gc *gitalyClient) EachCommit(f CommitFunc) error {
 				Committer: gitalyBuildSignature(cmt.Committer),
 			}
 
-			log.Debug("Indexing commit: ", cmt.Id)
+			log.Debug("Commit indexed: ", cmt.Id)
 
 			if err := f(commit); err != nil {
 				return err
