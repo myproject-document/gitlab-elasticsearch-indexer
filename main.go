@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -17,7 +18,6 @@ var (
 	versionFlag     = flag.Bool("version", false, "Print the version and exit")
 	skipCommitsFlag = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
 	blobTypeFlag    = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
-	// mbergeron: should we also put the `blobType` flag in the input-file tuple?
 	inputFileFlag   = flag.String("input-file", "", "TSV file containing the list of indexation tuples (project_id, repository_path, base_sha)")
 
 	// Overriden in the makefile
@@ -25,16 +25,109 @@ var (
 	BuildTime = ""
 )
 
-// mbergeron: use `json`
 type InputTuple struct {
-	ProjectID int64
+	indexer.ProjectID
 	RepositoryPath string
 	BaseSHA string
 	BlobType string
 	SkipCommits bool
+	Success bool
+}
+
+func (i *InputTuple) Serialize() string {
+	var successBit int64
+	if i.Success {
+		successBit = 1
+	}
+	
+	return strings.Join(
+		[]string{strconv.FormatInt(int64(i.ProjectID), 10), i.RepositoryPath, i.BaseSHA, strconv.FormatInt(successBit, 2)},
+		"\t",
+	)
+}
+
+func parseProjectID(s *string) (indexer.ProjectID, error) {
+	projectID, err := strconv.ParseInt(*s, 10, 64)
+	if err != nil {
+		return -1, fmt.Errorf("Invalid ProjectID, got %s", *s) 
+	}
+
+	return indexer.ProjectID(projectID), nil
+}
+
+func parseOperations() *map[string]*InputTuple {
+	args := flag.Args()
+
+	// Using a map ensure we can enforce that there is a single
+	// tuple by `RepositoryPath`, which is currently unsupported
+	// by the indexation logic.
+	inputs := make(map[string]*InputTuple)
+
+	blobType := *blobTypeFlag
+	skipCommits := *skipCommitsFlag
+
+	if *inputFileFlag == "" {
+ 	  if len(args) != 2 {
+	    log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> | --input-file)]", os.Args[0])
+	  }
+
+		// inline invocation, create a single `InputTuple` from the args
+		projectID, err := parseProjectID(&args[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		
+		repositoryPath := args[1]
+
+		inputs[repositoryPath] = &InputTuple{
+			ProjectID: projectID,
+			RepositoryPath: repositoryPath,
+			BaseSHA: os.Getenv("FROM_SHA"),
+			BlobType: blobType,
+			SkipCommits: skipCommits,
+		}
+	} else {
+		inputFile, err := os.Open(*inputFileFlag)
+		if (err != nil) {
+			log.Fatalf("Cannot open file at %s: %s.", inputFileFlag, err)
+		}
+
+		scanner := bufio.NewScanner(inputFile)
+
+		for scanner.Scan() {
+			parts := strings.Split(scanner.Text(), "\t")
+
+			if l := len(parts); l != 3 {
+				log.Fatalf("Missing arguments, expected 3 got %d", l) 
+			}
+
+			repositoryPath := parts[1]
+			if _, exists := inputs[repositoryPath]; exists {
+				log.Fatalf("Repositories can only be specified once, found '%s' multiple times", repositoryPath) 
+			}
+
+			projectID, err := parseProjectID(&parts[0])
+			if err != nil {
+				log.Fatal(err) 
+			}
+
+			input := &InputTuple{
+				ProjectID: projectID,
+				RepositoryPath: repositoryPath,
+				BaseSHA: parts[2],
+				BlobType: blobType,
+				SkipCommits: skipCommits,
+			}
+
+			inputs[repositoryPath] = input
+		}
+	}
+
+	return &inputs
 }
 
 func main() {
+	configureLogger()
 	flag.Parse()
 
 	if *versionFlag {
@@ -42,48 +135,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	configureLogger()
-	args := flag.Args()
-
-	// if len(args) != 2 {
-	// 	log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> <base_sha> | --input-file)]", os.Args[0])
-	// }
-
-	blobType := *blobTypeFlag
-	skipCommits := *skipCommitsFlag
-	inputFilePath := flag.Lookup("input-file").Value.String()
-
-	inputFile, err := os.Open(inputFilePath)
-	if (err != nil) {
-		log.Fatalf("Cannot open file at %s: %s.", inputFilePath, err)
-	}
-
-	scanner := bufio.NewScanner(inputFile)
-
-	// Let's buffer up the inputs to close the file ASAP.
-	var inputs []*InputTuple
-	for scanner.Scan() {
-		parts := strings.Split(scanner.Text(), "\t")
-
-		if l := len(parts); l != 3 {
-			log.Fatalf("Missing arguments, expected 3 got %d", l) 
-		}
-
-		projectID, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil {
-			log.Fatalf("Invalid ProjectID, got %s", args[0]) 
-		}
-
-		input := &InputTuple{
-			ProjectID: projectID,
-			RepositoryPath: parts[1],
-			BaseSHA: parts[2],
-			BlobType: blobType,
-			SkipCommits: skipCommits,
-		}
-
-		inputs = append(inputs, input)
-	}
+	inputs := parseOperations()
 
 	esClient, err := elastic.FromEnv()
 	if err != nil {
@@ -91,19 +143,17 @@ func main() {
 	}
 
 	// mbergeron: this is where we could leverage fanning-out
-	for _, input := range inputs {
-		var errors []error
-		
-		if err := indexProject(input, esClient); err != nil {
-			errors = append(errors, err)
+	for _, input := range *inputs {
+		indexedSHA, err := indexProject(input, esClient)
+		if err != nil {
+			input.Success = false
+			log.Errorf("Indexing error: %s", err)
+		} else {
+			input.BaseSHA = indexedSHA
+			input.Success = true
 		}
 
-		// mbergeron: we should output the list of `InputTuple` that had an error
-		// in the same format
-
-		for _, err := range errors {
-			log.Error(err)
-		}
+		os.Stdout.WriteString(input.Serialize())
 	}
 
 	if err := esClient.Flush(); err != nil {
@@ -111,11 +161,10 @@ func main() {
 	}
 }
 
-func indexProject(input *InputTuple, client *elastic.Client) error {
+func indexProject(input *InputTuple, client *elastic.Client) (string, error) {
 	repo, err := git.NewGitalyClientFromEnv(input.RepositoryPath, input.BaseSHA, "")
 	if err != nil {
-		// wrap the error
-		log.Fatal(err)
+		return input.BaseSHA, err
 	}
 
 	idx := &indexer.Indexer{
@@ -128,22 +177,21 @@ func indexProject(input *InputTuple, client *elastic.Client) error {
 	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", client.IndexName, input.ProjectID, input.BlobType, input.SkipCommits)
 
 	if err := idx.IndexBlobs(input.BlobType); err != nil {
-		// wrap the error
-		log.Fatalln("Indexing error: ", err)
+		return input.BaseSHA, err
 	}
 
 	if !input.SkipCommits && input.BlobType == "blob" {
 		if err := idx.IndexCommits(); err != nil {
-			// wrap the error
-			log.Fatalln("Indexing error: ", err)
+			return input.BaseSHA, err
 		}
 	}
 
-	return nil
+	// This SHA will be used to update the project's `index_status` for incremental updates
+	return repo.ToHash, nil
 }
 
 func configureLogger() {
-	log.SetOutput(os.Stdout)
+	log.SetOutput(os.Stderr)
 	_, debug := os.LookupEnv("DEBUG")
 
 	if debug {

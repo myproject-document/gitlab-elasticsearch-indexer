@@ -196,18 +196,6 @@ func (c *Client) Get(id DocumentRef) (*elastic.GetResult, error) {
 		Do(context.TODO())
 }
 
-/*
-// TODO: Use DocumentRef instead
-func (c *Client) GetCommit(id CommitID) (*elastic.GetResult, error) {
-	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, id))
-}
-
-// TODO: Use DocumentRef instead
-func (c *Client) GetBlob(path string) (*elastic.GetResult, error) {
-	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, path))
-}
-*/
-
 func (c *Client) Remove(id DocumentRef) {
 	req := elastic.NewBulkDeleteRequest().
 		Index(c.IndexName).
