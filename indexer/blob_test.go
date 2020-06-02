@@ -12,11 +12,11 @@ import (
 func TestBuildBlob(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	expected := validBlob(file, "foo", "Text")
+	commitID := indexer.CommitID{ indexer.ProjectID(parentID), expected.CommitSHA }
+	actualBlob, err := indexer.BuildBlob(file, commitID, "blob")
 
-	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob")
 	require.NoError(t, err)
-
-	require.Equal(t, expected, actual)
+	require.Equal(t, expected, actualBlob)
 
 	expectedJSON := `{
 		"commit_sha" : "` + expected.CommitSHA + `",
@@ -29,7 +29,7 @@ func TestBuildBlob(t *testing.T) {
 		"type"       : "blob"
 	}`
 
-	actualJSON, err := json.Marshal(actual)
+	actualJSON, err := json.Marshal(actualBlob)
 	require.NoError(t, err)
 	require.JSONEq(t, expectedJSON, string(actualJSON))
 }
@@ -37,23 +37,26 @@ func TestBuildBlob(t *testing.T) {
 func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	file.Size = 1024*1024 + 1
+	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
 	require.Error(t, err, indexer.SkipTooLargeBlob)
 	require.Nil(t, blob)
 }
 
 func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo\x00")
+	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
 	require.Equal(t, err, indexer.SkipBinaryBlob)
 	require.Nil(t, blob)
 }
 
 func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 	file := gitFile("Makefile.am", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.NoError(t, err)
 	require.Equal(t, "Makefile", blob.Language)
@@ -61,12 +64,15 @@ func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 	file := gitFile("foo.rb", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.NoError(t, err)
 	require.Equal(t, "Ruby", blob.Language)
 }
 
-func TestGenerateBlobID(t *testing.T) {
-	require.Equal(t, "2147483648_path", indexer.GenerateBlobID(2147483648, "path"))
+func TestBlobIDRef(t *testing.T) {
+	blobID := indexer.BlobID{ 2147483648, "path" }
+	
+	require.Equal(t, "2147483648_path", blobID.Ref())
 }

@@ -13,7 +13,7 @@ func TestBuildCommit(t *testing.T) {
 	gitCommit := gitCommit("Initial commit")
 
 	expected := validCommit(gitCommit)
-	actual := indexer.BuildCommit(gitCommit, parentID)
+	actual := indexer.BuildCommit(gitCommit, indexer.ProjectID(parentID))
 
 	require.Equal(t, expected, actual)
 
@@ -39,6 +39,7 @@ func TestBuildCommit(t *testing.T) {
 	require.JSONEq(t, expectedJSON, string(actualJSON))
 }
 
-func TestGenerateCommitID(t *testing.T) {
-	require.Equal(t, "2147483648_sha", indexer.GenerateCommitID(2147483648, "sha"))
+func TestCommitIDRef(t *testing.T) {
+	commitID := indexer.CommitID{ indexer.ProjectID(2147483648), "sha" }
+	require.Equal(t, "2147483648_sha", commitID.Ref())
 }

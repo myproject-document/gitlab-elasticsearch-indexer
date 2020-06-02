@@ -17,8 +17,8 @@ type Submitter interface {
 
 type ProjectID int64
 
-func (p *ProjectID) Ref() string {
-	return fmt.Sprintf("project_%v", p)
+func (p ProjectID) Ref() string {
+	return fmt.Sprintf("project_%d", p)
 }
 
 type CommitID struct {
@@ -27,7 +27,7 @@ type CommitID struct {
 }
 
 func (c *CommitID) Ref() string {
-	return fmt.Sprintf("%v_%d", c.ProjectID, c.SHA)
+	return fmt.Sprintf("%v_%s", c.ProjectID, c.SHA)
 }
 
 func (c *CommitID) RoutingRef() string {
@@ -40,7 +40,7 @@ type BlobID struct {
 }
 
 func (b *BlobID) Ref() string {
-	return fmt.Sprintf("%v_%d", b.ProjectID, b.FilePath)
+	return fmt.Sprintf("%v_%s", b.ProjectID, b.FilePath)
 }
 
 func (b *BlobID) RoutingRef() string {
@@ -67,6 +67,7 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 	commitID := CommitID{ i.ProjectID, toCommit }
 	blob, err := BuildBlob(f, commitID, "blob")
+
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil

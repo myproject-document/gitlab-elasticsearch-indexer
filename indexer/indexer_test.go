@@ -13,12 +13,13 @@ import (
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 )
 
 const (
 	sha            = "9876543210987654321098765432109876543210"
 	oid            = "0123456789012345678901234567890123456789"
-	parentID       = int64(667)
+	parentID       = indexer.ProjectID(667)
 	parentIDString = "667"
 )
 
@@ -41,15 +42,15 @@ type fakeRepository struct {
 	removed  []*git.File
 }
 
-func (f *fakeSubmitter) Index(id string, thing interface{}) {
+func (f *fakeSubmitter) Index(id elastic.DocumentRef, thing interface{}) {
 	f.indexed++
-	f.indexedID = append(f.indexedID, id)
+	f.indexedID = append(f.indexedID, id.Ref())
 	f.indexedThing = append(f.indexedThing, thing)
 }
 
-func (f *fakeSubmitter) Remove(id string) {
+func (f *fakeSubmitter) Remove(id elastic.DocumentRef) {
 	f.removed++
-	f.removedID = append(f.removedID, id)
+	f.removedID = append(f.removedID, id.Ref())
 }
 
 func (f *fakeSubmitter) Flush() error {
@@ -94,6 +95,7 @@ func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	submitter := &fakeSubmitter{}
 
 	return &indexer.Indexer{
+		ProjectID: parentID,
 		Repository: repo,
 		Submitter:  submitter,
 	}, repo, submitter
@@ -134,7 +136,7 @@ func gitCommit(message string) *git.Commit {
 func validBlob(file *git.File, content, language string) *indexer.Blob {
 	return &indexer.Blob{
 		Type:      "blob",
-		ID:        indexer.GenerateBlobID(parentID, file.Path),
+		ID:        &indexer.BlobID{ parentID, file.Path },
 		OID:       oid,
 		RepoID:    parentIDString,
 		CommitSHA: sha,
@@ -148,7 +150,7 @@ func validBlob(file *git.File, content, language string) *indexer.Blob {
 func validCommit(gitCommit *git.Commit) *indexer.Commit {
 	return &indexer.Commit{
 		Type:      "commit",
-		ID:        indexer.GenerateCommitID(parentID, gitCommit.Hash),
+		ID:        &indexer.CommitID{ parentID, gitCommit.Hash },
 		Author:    indexer.BuildPerson(gitCommit.Author),
 		Committer: indexer.BuildPerson(gitCommit.Committer),
 		RepoID:    parentIDString,

@@ -39,6 +39,8 @@ type Client struct {
 	bulkFailed  bool
 }
 
+type Result = elastic.GetResult
+
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
 // environment variable
 func FromEnv() (*Client, error) {
@@ -187,7 +189,7 @@ func (c *Client) Index(id DocumentRef, thing interface{}) {
 }
 
 // We only really use this for tests
-func (c *Client) Get(id DocumentRef) (*elastic.GetResult, error) {
+func (c *Client) Get(id DocumentRef) (*Result, error) {
 	return c.Client.Get().
 		Index(c.IndexName).
 		Type("doc").

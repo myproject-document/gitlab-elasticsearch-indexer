@@ -38,6 +38,19 @@ const credsFailRespTmpl = `{
   "LastUpdated": "2009-11-23T0:00:00Z"
 }`
 
+type DocumentID struct {
+	RawRef string
+	RawRoutingRef string
+}
+
+func (d *DocumentID) Ref() string {
+	return d.RawRef
+}
+
+func (d *DocumentID) RoutingRef() string {
+	return d.RawRoutingRef
+}
+
 func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -165,31 +178,33 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	client := setupTestClientAndCreateIndex(t)
 
 	blobDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_foo", blobDoc)
+	blobID := DocumentID{ projectIDString, projectIDString + "_foo" }
+	client.Index(&blobID, blobDoc)
 
 	commitDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_0000", commitDoc)
+	commitID := DocumentID{ projectIDString, projectIDString + "_0000" }
+	client.Index(&commitID, commitDoc)
 
 	require.NoError(t, client.Flush())
 
-	blob, err := client.GetBlob("foo")
+	blob, err := client.Get(&blobID)
 	require.NoError(t, err)
 	require.Equal(t, true, blob.Found)
 
-	commit, err := client.GetCommit("0000")
+	commit, err := client.Get(&commitID)
 	require.NoError(t, err)
 	require.Equal(t, true, commit.Found)
 
-	client.Remove(projectIDString + "_foo")
+	client.Remove(&blobID)
 	require.NoError(t, client.Flush())
 
-	_, err = client.GetBlob("foo")
+	_, err = client.Get(&blobID)
 	require.Error(t, err)
 
 	// indexing a doc with unexpected field will cause an ES strict_dynamic_mapping_exception
 	// for our IndexMapping
 	blobDocInvalid := map[string]interface{}{fmt.Sprintf("invalid-key-%d", time.Now().Unix()): ""}
-	client.Index(projectIDString+"_invalid", blobDocInvalid)
+	client.Index(&blobID, blobDocInvalid)
 	require.Error(t, client.Flush())
 
 	require.NoError(t, client.DeleteIndex())
@@ -202,7 +217,8 @@ func TestFlushErrorWithESActionRequestValidationException(t *testing.T) {
 	// so that the `err` param passed to `afterFunc` is not nil
 	client.IndexName = ""
 	blobDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_foo", blobDoc)
+	blobID := DocumentID{ projectIDString, projectIDString + "_foo" }
+	client.Index(&blobID, blobDoc)
 
 	require.Error(t, client.Flush())
 }
@@ -233,5 +249,4 @@ func TestElasticReadConfigCustomBulkSettings(t *testing.T) {
 
 	require.Equal(t, 1024, config.MaxBulkSize)
 	require.Equal(t, 6, config.BulkWorkers)
-
 }

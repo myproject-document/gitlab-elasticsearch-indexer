@@ -26,7 +26,7 @@ var (
 )
 
 const (
-	projectID         = 667
+	projectID         = indexer.ProjectID(667)
 	projectIDString   = "667"
 	headSHA           = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
 	testRepo          = "test-gitlab-elasticsearch-indexer/gitlab-test.git"
@@ -56,15 +56,15 @@ func TestIndexingRenamesFiles(t *testing.T) {
 	// The commit before files/js/commit.js.coffee is renamed
 	err, _, _ := run("", "281d3a76f31c812dbf48abce82ccf6860adedd81")
 	require.NoError(t, err)
-	_, err = c.GetBlob("files/js/commit.js.coffee")
+	_, err = fetchBlob(c, "files/js/commit.js.coffee")
 	require.NoError(t, err)
 
 	// Now we expect it to have been renamed
 	err, _, _ = run("281d3a76f31c812dbf48abce82ccf6860adedd81", "c347ca2e140aa667b968e51ed0ffe055501fe4f4")
 	require.NoError(t, err)
-	_, err = c.GetBlob("files/js/commit.js.coffee")
+	_, err = fetchBlob(c, "files/js/commit.js.coffee")
 	require.Error(t, err)
-	_, err = c.GetBlob("files/js/commit.coffee")
+	_, err = fetchBlob(c, "files/js/commit.coffee")
 	require.NoError(t, err)
 }
 
@@ -116,7 +116,7 @@ func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
 func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 	setElasticsearchConnectionInfo(t)
 
-	client, err := elastic.FromEnv(projectID)
+	client, err := elastic.FromEnv()
 	require.NoError(t, err)
 
 	if working {
@@ -140,6 +140,24 @@ func setElasticsearchConnectionInfo(t *testing.T) {
 	require.NoError(t, err)
 
 	os.Setenv("ELASTIC_CONNECTION_INFO", string(out))
+}
+
+func fetchBlob(c *elastic.Client, path string) (*elastic.Result, error)  {
+	blobID := indexer.BlobID{
+		ProjectID: projectID,
+		FilePath: path,
+	}
+
+	return c.Get(&blobID);
+}
+
+func fetchCommit(c *elastic.Client, sha string) (*elastic.Result, error) {
+	commitID := indexer.CommitID{
+		ProjectID: projectID,
+		SHA: sha,
+	}
+
+	return c.Get(&commitID);
 }
 
 func run(from, to string, args ...string) (error, string, string) {
@@ -178,13 +196,13 @@ func TestIndexingRemovesFiles(t *testing.T) {
 	// The commit before files/empty is removed - so it should be indexed
 	err, _, _ := run("", "19e2e9b4ef76b422ce1154af39a91323ccc57434")
 	require.NoError(t, err)
-	_, err = c.GetBlob("files/empty")
+	_, err = fetchBlob(c, "files/empty")
 	require.NoError(t, err)
 
 	// Now we expect it to have been removed
 	err, _, _ = run("19e2e9b4ef76b422ce1154af39a91323ccc57434", "08f22f255f082689c0d7d39d19205085311542bc")
 	require.NoError(t, err)
-	_, err = c.GetBlob("files/empty")
+	_, err = fetchBlob(c, "files/empty")
 	require.Error(t, err)
 }
 
@@ -214,7 +232,7 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 		{"SHIFT_JIS", "encoding/test.txt", "これはテストです。\nこれもマージして下さい。\n\nAdd excel file.\nDelete excel file."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			blob, err := c.GetBlob(tc.path)
+			blob, err := fetchBlob(c, tc.path)
 			require.NoError(t, err)
 
 			blobDoc := &document{}
@@ -247,7 +265,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check the indexing of a commit
-	commit, err := c.GetCommit(headSHA)
+	commit, err := fetchCommit(c, headSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
 	require.Equal(t, "doc", commit.Type)
@@ -285,7 +303,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 	)
 
 	// Check the indexing of a text blob
-	blob, err := c.GetBlob("README.md")
+	blob, err := fetchBlob(c, "README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)
@@ -313,11 +331,11 @@ func TestIndexingGitlabTest(t *testing.T) {
 	)
 
 	// Check that a binary blob isn't indexed
-	_, err = c.GetBlob("Gemfile.zip")
+	_, err = fetchBlob(c, "Gemfile.zip")
 	require.Error(t, err)
 
 	// Test that timezones are preserved
-	commit, err = c.GetCommit("498214de67004b1da3d820901307bed2a68a8ef6")
+	commit, err = fetchCommit(c, "498214de67004b1da3d820901307bed2a68a8ef6")
 	require.NoError(t, err)
 
 	cDoc := &document{}
@@ -341,12 +359,12 @@ func TestIndexingWikiBlobs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that commits were not indexed
-	commit, err := c.GetCommit(headSHA)
+	commit, err := fetchCommit(c, headSHA)
 	require.Error(t, err)
 	require.Empty(t, commit)
 
 	// Check that blobs are indexed
-	blob, err := c.GetBlob("README.md")
+	blob, err := fetchBlob(c, "README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)

@@ -89,7 +89,7 @@ func parseOperations() *map[string]*InputTuple {
 	} else {
 		inputFile, err := os.Open(*inputFileFlag)
 		if (err != nil) {
-			log.Fatalf("Cannot open file at %s: %s.", inputFileFlag, err)
+			log.Fatalf("Cannot open file at %s: %s.", *inputFileFlag, err)
 		}
 
 		scanner := bufio.NewScanner(inputFile)
@@ -153,7 +153,13 @@ func main() {
 			input.Success = true
 		}
 
-		os.Stdout.WriteString(input.Serialize())
+		// mbergeron: The best approach here would be to only write this
+		// whenever the bulk request that contains it has been flushed
+		// successfully.
+		//
+		// This would enable the caller of this process to consume the
+		// output as a stream of flush events.
+		os.Stdout.WriteString(input.Serialize() + "\n")
 	}
 
 	if err := esClient.Flush(); err != nil {
