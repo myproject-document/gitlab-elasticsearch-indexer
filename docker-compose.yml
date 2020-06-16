@@ -9,3 +9,6 @@ services:
     image: elasticsearch:6.8.6
     ports:
       - '9201:9200'
+
+volumes:
+  gitaly: {}

@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"flag"
-	"fmt"
 	"os"
-	"strconv"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
@@ -25,105 +21,53 @@ var (
 	BuildTime = ""
 )
 
-type InputTuple struct {
-	indexer.ProjectID
-	RepositoryPath string
-	BaseSHA string
-	BlobType string
-	SkipCommits bool
-	Success bool
-}
-
-func (i *InputTuple) Serialize() string {
-	var successBit int64
-	if i.Success {
-		successBit = 1
-	}
-	
-	return strings.Join(
-		[]string{strconv.FormatInt(int64(i.ProjectID), 10), i.RepositoryPath, i.BaseSHA, strconv.FormatInt(successBit, 2)},
-		"\t",
-	)
-}
-
-func parseProjectID(s *string) (indexer.ProjectID, error) {
-	projectID, err := strconv.ParseInt(*s, 10, 64)
-	if err != nil {
-		return -1, fmt.Errorf("Invalid ProjectID, got %s", *s) 
-	}
-
-	return indexer.ProjectID(projectID), nil
-}
-
-func parseOperations() *map[string]*InputTuple {
+func parseOperations() *map[string]*indexer.IndexOperation {
 	args := flag.Args()
 
 	// Using a map ensure we can enforce that there is a single
-	// tuple by `RepositoryPath`, which is currently unsupported
+	// operation per `RepositoryPath`, which is currently unsupported
 	// by the indexation logic.
-	inputs := make(map[string]*InputTuple)
-
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
 
 	if *inputFileFlag == "" {
  	  if len(args) != 2 {
-	    log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> | --input-file)]", os.Args[0])
+	    log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> | --input-file <input-file>)]", os.Args[0])
 	  }
 
-		// inline invocation, create a single `InputTuple` from the args
-		projectID, err := parseProjectID(&args[0])
+		// inline invocation, create a single `indexer.IndexOperation` from the args
+		projectID, err := indexer.ParseProjectID(&args[0])
 		if err != nil {
 			log.Fatal(err)
 		}
 		
+		inputs := make(map[string]*indexer.IndexOperation)
 		repositoryPath := args[1]
 
-		inputs[repositoryPath] = &InputTuple{
+		inputs[repositoryPath] = &indexer.IndexOperation{
 			ProjectID: projectID,
 			RepositoryPath: repositoryPath,
 			BaseSHA: os.Getenv("FROM_SHA"),
 			BlobType: blobType,
 			SkipCommits: skipCommits,
 		}
+
+		return &inputs
 	} else {
 		inputFile, err := os.Open(*inputFileFlag)
 		if (err != nil) {
 			log.Fatalf("Cannot open file at %s: %s.", *inputFileFlag, err)
 		}
 
-		scanner := bufio.NewScanner(inputFile)
-
-		for scanner.Scan() {
-			parts := strings.Split(scanner.Text(), "\t")
-
-			if l := len(parts); l != 3 {
-				log.Fatalf("Missing arguments, expected 3 got %d", l) 
-			}
-
-			repositoryPath := parts[1]
-			if _, exists := inputs[repositoryPath]; exists {
-				log.Fatalf("Repositories can only be specified once, found '%s' multiple times", repositoryPath) 
-			}
-
-			projectID, err := parseProjectID(&parts[0])
-			if err != nil {
-				log.Fatal(err) 
-			}
-
-			input := &InputTuple{
-				ProjectID: projectID,
-				RepositoryPath: repositoryPath,
-				BaseSHA: parts[2],
-				BlobType: blobType,
-				SkipCommits: skipCommits,
-			}
-
-			inputs[repositoryPath] = input
+		reader := indexer.IndexOperationReader{
+			Reader: inputFile,
+			BlobType: blobType,
+			SkipCommits: skipCommits,
 		}
-	}
 
-	return &inputs
+		operations, err := reader.ReadOperations()
+		return &operations
+	}
 }
 
 func main() {
@@ -146,11 +90,10 @@ func main() {
 	for _, input := range *inputs {
 		indexedSHA, err := indexProject(input, esClient)
 		if err != nil {
-			input.Success = false
+			input.ErrorCode = 1
 			log.Errorf("Indexing error: %s", err)
 		} else {
 			input.BaseSHA = indexedSHA
-			input.Success = true
 		}
 
 		// mbergeron: The best approach here would be to only write this
@@ -167,7 +110,7 @@ func main() {
 	}
 }
 
-func indexProject(input *InputTuple, client *elastic.Client) (string, error) {
+func indexProject(input *indexer.IndexOperation, client *elastic.Client) (string, error) {
 	repo, err := git.NewGitalyClientFromEnv(input.RepositoryPath, input.BaseSHA, "")
 	if err != nil {
 		return input.BaseSHA, err

@@ -3,6 +3,7 @@ package indexer
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
@@ -19,6 +20,17 @@ type ProjectID int64
 
 func (p ProjectID) Ref() string {
 	return fmt.Sprintf("project_%d", p)
+}
+
+func ParseProjectID(s *string) (ProjectID, error) {
+	id, err := strconv.ParseInt(*s, 10, 64)
+	projectID := ProjectID(id)
+
+	if err != nil {
+		return projectID, fmt.Errorf("Invalid ProjectID, got %s", *s) 
+	}
+
+	return projectID, nil
 }
 
 type CommitID struct {
