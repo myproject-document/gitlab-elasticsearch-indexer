@@ -32,13 +32,13 @@ func isSkipBlobErr(err error) bool {
 }
 
 type Blob struct {
-	ID        *BlobID  `json:"-"`
-	Type      string	 `json:"type"`
-	OID       string	 `json:"oid"`
-	RepoID    string	 `json:"rid"`
-	CommitSHA string	 `json:"commit_sha"`
-	Content   string	 `json:"content"`
-	Path      string	 `json:"path"`
+	ID        *BlobID `json:"-"`
+	Type      string  `json:"type"`
+	OID       string  `json:"oid"`
+	RepoID    string  `json:"rid"`
+	CommitSHA string  `json:"commit_sha"`
+	Content   string  `json:"content"`
+	Path      string  `json:"path"`
 
 	// Message copied from gitlab-elasticsearch-git:
 	//
@@ -50,8 +50,8 @@ type Blob struct {
 	//install newest versions
 	//
 	//https://github.com/elastic/elasticsearch-mapper-attachments/issues/124
-	Filename string				`json:"file_name"`
-	Language string				`json:"language"`
+	Filename string `json:"file_name"`
+	Language string `json:"language"`
 }
 
 func BuildBlob(file *git.File, commitID CommitID, blobType string) (*Blob, error) {
@@ -68,7 +68,7 @@ func BuildBlob(file *git.File, commitID CommitID, blobType string) (*Blob, error
 
 	// FIXME(nick): This doesn't look cheap. Check the RAM & CPU pressure, esp.
 	// for large blobs
-  //
+	//
 	// We could alternatively read _N_ bytes then try to do the binary
 	// detection, like CharlockHolmes does in Ruby and try to bail out
 	// if the blob is binary, or read the rest of the file.
@@ -84,7 +84,7 @@ func BuildBlob(file *git.File, commitID CommitID, blobType string) (*Blob, error
 	filename := tryEncodeString(file.Path)
 	content := tryEncodeBytes(b)
 	blob := &Blob{
-		ID:        &BlobID{ commitID.ProjectID, filename },
+		ID:        &BlobID{commitID.ProjectID, filename},
 		OID:       file.Oid,
 		CommitSHA: commitID.SHA,
 		Content:   content,

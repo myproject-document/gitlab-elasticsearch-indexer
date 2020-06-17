@@ -39,7 +39,7 @@ const credsFailRespTmpl = `{
 }`
 
 type DocumentID struct {
-	RawRef string
+	RawRef        string
 	RawRoutingRef string
 }
 
@@ -169,6 +169,11 @@ func setupTestClient(t *testing.T) *elastic.Client {
 
 func setupTestClientAndCreateIndex(t *testing.T) *elastic.Client {
 	client := setupTestClient(t)
+
+	t.Cleanup(func() {
+		require.NoError(t, client.DeleteIndex())
+	})
+
 	require.NoError(t, client.CreateWorkingIndex())
 
 	return client
@@ -178,11 +183,11 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	client := setupTestClientAndCreateIndex(t)
 
 	blobDoc := map[string]interface{}{}
-	blobID := DocumentID{ projectIDString, projectIDString + "_foo" }
+	blobID := DocumentID{projectIDString, projectIDString + "_foo"}
 	client.Index(&blobID, blobDoc)
 
 	commitDoc := map[string]interface{}{}
-	commitID := DocumentID{ projectIDString, projectIDString + "_0000" }
+	commitID := DocumentID{projectIDString, projectIDString + "_0000"}
 	client.Index(&commitID, commitDoc)
 
 	require.NoError(t, client.Flush())
@@ -206,8 +211,6 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	blobDocInvalid := map[string]interface{}{fmt.Sprintf("invalid-key-%d", time.Now().Unix()): ""}
 	client.Index(&blobID, blobDocInvalid)
 	require.Error(t, client.Flush())
-
-	require.NoError(t, client.DeleteIndex())
 }
 
 func TestFlushErrorWithESActionRequestValidationException(t *testing.T) {
@@ -217,7 +220,7 @@ func TestFlushErrorWithESActionRequestValidationException(t *testing.T) {
 	// so that the `err` param passed to `afterFunc` is not nil
 	client.IndexName = ""
 	blobDoc := map[string]interface{}{}
-	blobID := DocumentID{ projectIDString, projectIDString + "_foo" }
+	blobID := DocumentID{projectIDString, projectIDString + "_foo"}
 	client.Index(&blobID, blobDoc)
 
 	require.Error(t, client.Flush())

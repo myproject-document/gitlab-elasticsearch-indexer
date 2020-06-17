@@ -2,7 +2,6 @@ package main_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,77 +12,39 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	gitalyClient "gitlab.com/gitlab-org/gitaly/client"
 	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
+
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
+	H "gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/testhelpers"
 )
 
 var (
-	binary         = flag.String("binary", "./bin/gitlab-elasticsearch-indexer", "Path to `gitlab-elasticsearch-indexer` binary for integration tests")
-	gitalyConnInfo *gitalyConnectionInfo
+	binary = flag.String("binary", "./bin/gitlab-elasticsearch-indexer", "Path to `gitlab-elasticsearch-indexer` binary for integration tests")
 )
-
-const (
-	projectID         = indexer.ProjectID(667)
-	projectIDString   = "667"
-	headSHA           = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
-	testRepo          = "test-gitlab-elasticsearch-indexer/gitlab-test.git"
-	testRepoPath      = "https://gitlab.com/gitlab-org/gitlab-test.git"
-	testRepoNamespace = "test-gitlab-elasticsearch-indexer"
-)
-
-type gitalyConnectionInfo struct {
-	Address string `json:"address"`
-	Storage string `json:"storage"`
-}
-
-func init() {
-	gci, exists := os.LookupEnv("GITALY_CONNECTION_INFO")
-	if exists {
-		json.Unmarshal([]byte(gci), &gitalyConnInfo)
-	}
-}
 
 func TestIndexingRenamesFiles(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
-
-	defer td()
+	repository, err := H.EnsureGitalyRepository(t)
+	c := buildWorkingIndex(t)
 
 	// The commit before files/js/commit.js.coffee is renamed
-	err, _, _ := run("", "281d3a76f31c812dbf48abce82ccf6860adedd81")
+	H.ResetHead(repository, "281d3a76f31c812dbf48abce82ccf6860adedd81")
+	err, _, _ = run(H.InitialSHA)
 	require.NoError(t, err)
+
 	_, err = fetchBlob(c, "files/js/commit.js.coffee")
+	require.NoError(t, err)
+
+	// The commit that renames files/js/commit.js.coffee → files/js/commit.coffee
+	H.ResetHead(repository, "6907208d755b60ebeacb2e9dfea74c92c3449a1f")
+	err, _, _ = run("281d3a76f31c812dbf48abce82ccf6860adedd81")
 	require.NoError(t, err)
 
 	// Now we expect it to have been renamed
-	err, _, _ = run("281d3a76f31c812dbf48abce82ccf6860adedd81", "c347ca2e140aa667b968e51ed0ffe055501fe4f4")
-	require.NoError(t, err)
 	_, err = fetchBlob(c, "files/js/commit.js.coffee")
 	require.Error(t, err)
 	_, err = fetchBlob(c, "files/js/commit.coffee")
-	require.NoError(t, err)
-}
-
-func ensureGitalyRepository(t *testing.T) {
-	conn, err := gitalyClient.Dial(gitalyConnInfo.Address, gitalyClient.DefaultDialOpts)
-	require.NoError(t, err)
-
-	namespace := pb.NewNamespaceServiceClient(conn)
-	repository := pb.NewRepositoryServiceClient(conn)
-
-	// Remove the repository if it already exists, for consistency
-	rmNsReq := &pb.RemoveNamespaceRequest{StorageName: gitalyConnInfo.Storage, Name: testRepoNamespace}
-	_, err = namespace.RemoveNamespace(context.Background(), rmNsReq)
-	require.NoError(t, err)
-
-	gl_repository := &pb.Repository{StorageName: gitalyConnInfo.Storage, RelativePath: testRepo}
-	createReq := &pb.CreateRepositoryFromURLRequest{Repository: gl_repository, Url: testRepoPath}
-
-	_, err = repository.CreateRepositoryFromURL(context.Background(), createReq)
 	require.NoError(t, err)
 }
 
@@ -105,19 +66,23 @@ func checkDeps(t *testing.T) {
 	}
 }
 
-func buildWorkingIndex(t *testing.T) (*elastic.Client, func()) {
+func buildWorkingIndex(t *testing.T) *elastic.Client {
 	return buildIndex(t, true)
 }
 
-func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
+func buildBrokenIndex(t *testing.T) *elastic.Client {
 	return buildIndex(t, false)
 }
 
-func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
+func buildIndex(t *testing.T, working bool) *elastic.Client {
 	setElasticsearchConnectionInfo(t)
 
 	client, err := elastic.FromEnv()
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, client.DeleteIndex())
+	})
 
 	if working {
 		require.NoError(t, client.CreateWorkingIndex())
@@ -125,9 +90,7 @@ func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 		require.NoError(t, client.CreateBrokenIndex())
 	}
 
-	return client, func() {
-		client.DeleteIndex()
-	}
+	return client
 }
 
 // Substitude index_name with a dynamically generated one
@@ -142,29 +105,29 @@ func setElasticsearchConnectionInfo(t *testing.T) {
 	os.Setenv("ELASTIC_CONNECTION_INFO", string(out))
 }
 
-func fetchBlob(c *elastic.Client, path string) (*elastic.Result, error)  {
+func fetchBlob(c *elastic.Client, path string) (*elastic.Result, error) {
 	blobID := indexer.BlobID{
-		ProjectID: projectID,
-		FilePath: path,
+		ProjectID: H.ProjectID,
+		FilePath:  path,
 	}
 
-	return c.Get(&blobID);
+	return c.Get(&blobID)
 }
 
 func fetchCommit(c *elastic.Client, sha string) (*elastic.Result, error) {
 	commitID := indexer.CommitID{
-		ProjectID: projectID,
-		SHA: sha,
+		ProjectID: H.ProjectID,
+		SHA:       sha,
 	}
 
-	return c.Get(&commitID);
+	return c.Get(&commitID)
 }
 
-func run(from, to string, args ...string) (error, string, string) {
+func run(from string, args ...string) (error, string, string) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	arguments := append(args, projectIDString, testRepo)
+	arguments := append(args, H.ProjectIDString, fmt.Sprintf("%s/%s.git", H.TestRepoNamespace, H.TestRepo))
 	cmd := exec.Command(*binary, arguments...)
 	cmd.Env = os.Environ()
 	cmd.Stdout = &stdout
@@ -177,30 +140,37 @@ func run(from, to string, args ...string) (error, string, string) {
 
 	cmd.Env = append(cmd.Env, "FROM_SHA="+from)
 
-	if to != "" {
-		cmd.Env = append(cmd.Env, "TO_SHA="+to)
-	}
-
 	err := cmd.Run()
+
+	if os.Getenv("DEBUG") != "" {
+		fmt.Println("=== STDOUT ===")
+		fmt.Printf(stdout.String())
+
+		fmt.Println("=== STDERR ===")
+		fmt.Printf(stderr.String())
+	}
 
 	return err, stdout.String(), stderr.String()
 }
 
 func TestIndexingRemovesFiles(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
-
-	defer td()
+	repository, err := H.EnsureGitalyRepository(t)
+	c := buildWorkingIndex(t)
 
 	// The commit before files/empty is removed - so it should be indexed
-	err, _, _ := run("", "19e2e9b4ef76b422ce1154af39a91323ccc57434")
+	H.ResetHead(repository, "9a944d90955aaf45f6d0c88f30e27f8d2c41cec0")
+
+	err, _, _ = run(H.InitialSHA)
 	require.NoError(t, err)
 	_, err = fetchBlob(c, "files/empty")
 	require.NoError(t, err)
 
+	// Reset HEAD back to a commit that removes files
+	H.ResetHead(repository, "08f22f255f082689c0d7d39d19205085311542bc")
+
 	// Now we expect it to have been removed
-	err, _, _ = run("19e2e9b4ef76b422ce1154af39a91323ccc57434", "08f22f255f082689c0d7d39d19205085311542bc")
+	err, _, _ = run("19e2e9b4ef76b422ce1154af39a91323ccc57434")
 	require.NoError(t, err)
 	_, err = fetchBlob(c, "files/empty")
 	require.Error(t, err)
@@ -216,11 +186,10 @@ type document struct {
 // Go source is defined to be UTF-8 encoded, so literals here are UTF-8
 func TestIndexingTranscodesToUTF8(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
-	defer td()
+	H.EnsureGitalyRepository(t)
+	c := buildWorkingIndex(t)
 
-	err, _, _ := run("", headSHA)
+	err, _, _ := run("")
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
@@ -245,11 +214,10 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 
 func TestElasticClientIndexMismatch(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	_, td := buildBrokenIndex(t)
-	defer td()
+	H.EnsureGitalyRepository(t)
+	buildBrokenIndex(t)
 
-	err, _, stderr := run("", headSHA)
+	err, _, stderr := run("")
 
 	require.Error(t, err)
 	require.Regexp(t, `bulk request \d: failed to insert \d/\d documents`, stderr)
@@ -257,20 +225,19 @@ func TestElasticClientIndexMismatch(t *testing.T) {
 
 func TestIndexingGitlabTest(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
-	defer td()
+	H.EnsureGitalyRepository(t)
+	c := buildWorkingIndex(t)
 
-	err, _, _ := run("", headSHA)
+	err, _, _ := run("")
 	require.NoError(t, err)
 
 	// Check the indexing of a commit
-	commit, err := fetchCommit(c, headSHA)
+	commit, err := fetchCommit(c, H.HeadSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
 	require.Equal(t, "doc", commit.Type)
-	require.Equal(t, projectIDString+"_"+headSHA, commit.Id)
-	require.Equal(t, "project_"+projectIDString, commit.Routing)
+	require.Equal(t, H.ProjectIDString+"_"+H.HeadSHA, commit.Id)
+	require.Equal(t, "project_"+H.ProjectIDString, commit.Routing)
 
 	data := make(map[string]interface{})
 	require.NoError(t, json.Unmarshal(*commit.Source, &data))
@@ -285,7 +252,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 		t,
 		map[string]interface{}{
 			"type": "commit",
-			"sha":  headSHA,
+			"sha":  H.HeadSHA,
 			"author": map[string]interface{}{
 				"email": "job@gitlab.com",
 				"name":  "Job van der Voort",
@@ -296,7 +263,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 				"name":  "Job van der Voort",
 				"time":  date.Local().Format("20060102T150405-0700"),
 			},
-			"rid":     projectIDString,
+			"rid":     H.ProjectIDString,
 			"message": "Merge branch 'branch-merged' into 'master'\r\n\r\nadds bar folder and branch-test text file to check Repository merged_to_root_ref method\r\n\r\n\r\n\r\nSee merge request !12",
 		},
 		commitDoc,
@@ -307,8 +274,8 @@ func TestIndexingGitlabTest(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)
-	require.Equal(t, projectIDString+"_README.md", blob.Id)
-	require.Equal(t, "project_"+projectIDString, blob.Routing)
+	require.Equal(t, H.ProjectIDString+"_README.md", blob.Id)
+	require.Equal(t, "project_"+H.ProjectIDString, blob.Routing)
 
 	data = make(map[string]interface{})
 	require.NoError(t, json.Unmarshal(*blob.Source, &data))
@@ -323,8 +290,8 @@ func TestIndexingGitlabTest(t *testing.T) {
 			"path":       "README.md",
 			"file_name":  "README.md",
 			"oid":        "faaf198af3a36dbf41961466703cc1d47c61d051",
-			"rid":        projectIDString,
-			"commit_sha": headSHA,
+			"rid":        H.ProjectIDString,
+			"commit_sha": H.HeadSHA,
 			"content":    "testme\n======\n\nSample repo for testing gitlab features\n",
 		},
 		blobDoc,
@@ -351,15 +318,14 @@ func TestIndexingGitlabTest(t *testing.T) {
 
 func TestIndexingWikiBlobs(t *testing.T) {
 	checkDeps(t)
-	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
-	defer td()
+	H.EnsureGitalyRepository(t)
+	c := buildWorkingIndex(t)
 
-	err, _, _ := run("", headSHA, "--blob-type=wiki_blob", "--skip-commits")
+	err, _, _ := run("", "--blob-type=wiki_blob", "--skip-commits")
 	require.NoError(t, err)
 
 	// Check that commits were not indexed
-	commit, err := fetchCommit(c, headSHA)
+	commit, err := fetchCommit(c, H.HeadSHA)
 	require.Error(t, err)
 	require.Empty(t, commit)
 
@@ -368,8 +334,8 @@ func TestIndexingWikiBlobs(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)
-	require.Equal(t, projectIDString+"_README.md", blob.Id)
-	require.Equal(t, "project_"+projectIDString, blob.Routing)
+	require.Equal(t, H.ProjectIDString+"_README.md", blob.Id)
+	require.Equal(t, "project_"+H.ProjectIDString, blob.Routing)
 
 	data := make(map[string]interface{})
 	require.NoError(t, json.Unmarshal(*blob.Source, &data))
@@ -384,11 +350,60 @@ func TestIndexingWikiBlobs(t *testing.T) {
 			"path":       "README.md",
 			"file_name":  "README.md",
 			"oid":        "faaf198af3a36dbf41961466703cc1d47c61d051",
-			"rid":        fmt.Sprintf("wiki_%s", projectIDString),
-			"commit_sha": headSHA,
+			"rid":        fmt.Sprintf("wiki_%s", H.ProjectIDString),
+			"commit_sha": H.HeadSHA,
 			"content":    "testme\n======\n\nSample repo for testing gitlab features\n",
 		},
 		blobDoc,
 	)
+}
 
+func TestInputFile(t *testing.T) {
+	const BatchSize = 3
+	const EmptySHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904" // git's empty tree id
+	const OperationsFilePath = "/tmp/gitlab-elasticsearch-indexer-input"
+
+	repositories := make([]*pb.Repository, BatchSize)
+
+	for i := 0; i < BatchSize; i++ {
+		repository, err := H.EnsureGitalyRepositoryInNamespace(t, fmt.Sprintf("ns_%d", i))
+		require.NoError(t, err)
+
+		repositories[i] = repository
+	}
+
+	{
+		operationsFile, err := os.Create(OperationsFilePath)
+		require.NoError(t, err)
+
+		defer operationsFile.Close()
+
+		for i, repository := range repositories {
+			operationSpec := fmt.Sprintf("%d\t%s\t%s\n", 1+i, repository.RelativePath, EmptySHA)
+			_, err := operationsFile.WriteString(operationSpec)
+			require.NoError(t, err)
+		}
+
+		operationsFile.Sync()
+	}
+
+	defer os.Remove(OperationsFilePath)
+
+	// let's use this file as `--input-file'
+	err, _, _ := run("", "--blob-type=blob", "--skip-commits", fmt.Sprintf("--input-file=%s", OperationsFilePath))
+	require.NoError(t, err)
+}
+
+func TestStdoutOperationResult(t *testing.T) {
+	checkDeps(t)
+	H.EnsureGitalyRepository(t)
+	buildWorkingIndex(t)
+
+	err, stdout, _ := run("", "--blob-type=blob", "--skip-commits")
+	require.NoError(t, err)
+
+	testRepoPath := fmt.Sprintf("%s/%s.git", H.TestRepoNamespace, H.TestRepo)
+	resultSpec := fmt.Sprintf("%d\t%s\t%s\t%d\n", H.ProjectID, testRepoPath, H.HeadSHA, 0)
+
+	require.Equal(t, resultSpec, stdout)
 }

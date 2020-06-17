@@ -40,6 +40,7 @@ type Client struct {
 }
 
 type Result = elastic.GetResult
+type Stats = elastic.BulkProcessorStats
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
 // environment variable
@@ -75,7 +76,11 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 	}
 
 	// bulk response can be nil in some cases, we must check first
-	if response != nil && response.Errors {
+	if response == nil {
+		return
+	}
+
+	if response.Errors {
 		numFailed := len(response.Failed())
 		if numFailed > 0 {
 			c.bulkFailed = true
@@ -127,6 +132,7 @@ func NewClient(config *Config) (*Client, error) {
 
 	bulk, err := client.BulkProcessor().
 		Workers(config.BulkWorkers).
+		Stats(true).
 		BulkSize(config.MaxBulkSize).
 		After(wrappedClient.afterCallback).
 		Do(context.Background())
@@ -173,6 +179,10 @@ func (c *Client) Flush() error {
 	return err
 }
 
+func (c *Client) Stats() Stats {
+	return c.bulk.Stats()
+}
+
 func (c *Client) Close() {
 	c.Client.Stop()
 }
@@ -181,7 +191,7 @@ func (c *Client) Index(id DocumentRef, thing interface{}) {
 	req := elastic.NewBulkIndexRequest().
 		Index(c.IndexName).
 		Type("doc").
-	  Routing(id.RoutingRef()).
+		Routing(id.RoutingRef()).
 		Id(id.Ref()).
 		Doc(thing)
 
@@ -202,7 +212,7 @@ func (c *Client) Remove(id DocumentRef) {
 	req := elastic.NewBulkDeleteRequest().
 		Index(c.IndexName).
 		Type("doc").
-	  Routing(id.RoutingRef()).
+		Routing(id.RoutingRef()).
 		Id(id.Ref())
 
 	c.bulk.Add(req)

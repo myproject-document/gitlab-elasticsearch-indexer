@@ -21,7 +21,7 @@ var (
 	BuildTime = ""
 )
 
-func parseOperations() *map[string]*indexer.IndexOperation {
+func parseOperations() map[string]*indexer.IndexOperation {
 	args := flag.Args()
 
 	// Using a map ensure we can enforce that there is a single
@@ -29,45 +29,46 @@ func parseOperations() *map[string]*indexer.IndexOperation {
 	// by the indexation logic.
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
+	indexOperations := make(map[string]*indexer.IndexOperation)
 
 	if *inputFileFlag == "" {
- 	  if len(args) != 2 {
-	    log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> | --input-file <input-file>)]", os.Args[0])
-	  }
+		if len(args) != 2 {
+			log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] (<project-id> <project-path> | --input-file <input-file>)]", os.Args[0])
+		}
 
 		// inline invocation, create a single `indexer.IndexOperation` from the args
 		projectID, err := indexer.ParseProjectID(&args[0])
 		if err != nil {
 			log.Fatal(err)
 		}
-		
-		inputs := make(map[string]*indexer.IndexOperation)
+
 		repositoryPath := args[1]
 
-		inputs[repositoryPath] = &indexer.IndexOperation{
-			ProjectID: projectID,
+		indexOperations[repositoryPath] = &indexer.IndexOperation{
+			ProjectID:      projectID,
 			RepositoryPath: repositoryPath,
-			BaseSHA: os.Getenv("FROM_SHA"),
-			BlobType: blobType,
-			SkipCommits: skipCommits,
+			BaseSHA:        os.Getenv("FROM_SHA"),
+			BlobType:       blobType,
+			SkipCommits:    skipCommits,
 		}
-
-		return &inputs
 	} else {
 		inputFile, err := os.Open(*inputFileFlag)
-		if (err != nil) {
+		if err != nil {
 			log.Fatalf("Cannot open file at %s: %s.", *inputFileFlag, err)
 		}
 
 		reader := indexer.IndexOperationReader{
-			Reader: inputFile,
-			BlobType: blobType,
+			Reader:      inputFile,
+			BlobType:    blobType,
 			SkipCommits: skipCommits,
 		}
 
-		operations, err := reader.ReadOperations()
-		return &operations
+		if _, err := reader.ReadAllInto(indexOperations); err != nil {
+			log.Fatalf("Cannot read index operations: %s", err)
+		}
 	}
+
+	return indexOperations
 }
 
 func main() {
@@ -79,59 +80,68 @@ func main() {
 		os.Exit(0)
 	}
 
-	inputs := parseOperations()
+	operations := parseOperations()
 
+	Index(operations)
+}
+
+func Index(operations map[string]*indexer.IndexOperation) elastic.Stats {
 	esClient, err := elastic.FromEnv()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// mbergeron: this is where we could leverage fanning-out
-	for _, input := range *inputs {
-		indexedSHA, err := indexProject(input, esClient)
+	for _, operation := range operations {
+		indexedSHA, err := indexProject(operation, esClient)
 		if err != nil {
-			input.ErrorCode = 1
+			operation.ErrorCode = 1
 			log.Errorf("Indexing error: %s", err)
 		} else {
-			input.BaseSHA = indexedSHA
+			operation.BaseSHA = indexedSHA
 		}
-
-		// mbergeron: The best approach here would be to only write this
-		// whenever the bulk request that contains it has been flushed
-		// successfully.
-		//
-		// This would enable the caller of this process to consume the
-		// output as a stream of flush events.
-		os.Stdout.WriteString(input.Serialize() + "\n")
 	}
 
-	if err := esClient.Flush(); err != nil {
-		log.Fatalln("Flushing error: ", err)
+	// mbergeron: Wait after the last flush to make sure
+	// the bulk request that contains the operations has been
+	// sent successfully.
+	//
+	// We can't determine which operation were part of the
+	// the failed bulk update, thus we need to assume they
+	// all failed.
+	err = esClient.Flush()
+	for _, operation := range operations {
+		if err != nil {
+			operation.ErrorCode = 2
+		}
+		os.Stdout.WriteString(operation.Serialize() + "\n")
 	}
+
+	return esClient.Stats()
 }
 
-func indexProject(input *indexer.IndexOperation, client *elastic.Client) (string, error) {
-	repo, err := git.NewGitalyClientFromEnv(input.RepositoryPath, input.BaseSHA, "")
+func indexProject(operation *indexer.IndexOperation, client *elastic.Client) (string, error) {
+	repo, err := git.NewGitalyClientFromEnv(operation.RepositoryPath, operation.BaseSHA, "")
 	if err != nil {
-		return input.BaseSHA, err
+		return operation.BaseSHA, err
 	}
 
 	idx := &indexer.Indexer{
-		ProjectID: indexer.ProjectID(input.ProjectID),
+		ProjectID:  indexer.ProjectID(operation.ProjectID),
 		Submitter:  client,
 		Repository: repo,
 	}
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
-	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", client.IndexName, input.ProjectID, input.BlobType, input.SkipCommits)
+	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", client.IndexName, operation.ProjectID, operation.BlobType, operation.SkipCommits)
 
-	if err := idx.IndexBlobs(input.BlobType); err != nil {
-		return input.BaseSHA, err
+	if err := idx.IndexBlobs(operation.BlobType); err != nil {
+		return operation.BaseSHA, err
 	}
 
-	if !input.SkipCommits && input.BlobType == "blob" {
+	if !operation.SkipCommits && operation.BlobType == "blob" {
 		if err := idx.IndexCommits(); err != nil {
-			return input.BaseSHA, err
+			return operation.BaseSHA, err
 		}
 	}
 

@@ -40,6 +40,6 @@ func TestBuildCommit(t *testing.T) {
 }
 
 func TestCommitIDRef(t *testing.T) {
-	commitID := indexer.CommitID{ indexer.ProjectID(2147483648), "sha" }
+	commitID := indexer.CommitID{indexer.ProjectID(2147483648), "sha"}
 	require.Equal(t, "2147483648_sha", commitID.Ref())
 }

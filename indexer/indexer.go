@@ -5,8 +5,8 @@ import (
 	"log"
 	"strconv"
 
-	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 )
 
 type Submitter interface {
@@ -27,7 +27,7 @@ func ParseProjectID(s *string) (ProjectID, error) {
 	projectID := ProjectID(id)
 
 	if err != nil {
-		return projectID, fmt.Errorf("Invalid ProjectID, got %s", *s) 
+		return projectID, fmt.Errorf("Invalid ProjectID, got %s", *s)
 	}
 
 	return projectID, nil
@@ -77,7 +77,7 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 }
 
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
-	commitID := CommitID{ i.ProjectID, toCommit }
+	commitID := CommitID{i.ProjectID, toCommit}
 	blob, err := BuildBlob(f, commitID, "blob")
 
 	if err != nil {
@@ -97,7 +97,7 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 }
 
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
-	commitID := CommitID{ i.ProjectID, toCommit }
+	commitID := CommitID{i.ProjectID, toCommit}
 	wikiBlob, err := BuildBlob(f, commitID, "wiki_blob")
 	if err != nil {
 		if isSkipBlobErr(err) {
@@ -111,16 +111,19 @@ func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
 		"name":   "wiki_blob",
 		"parent": i.ProjectID.Ref()}
 
+	log.Printf("Adding blob: %s", f.Path)
 	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{
 		"project_id": i.ProjectID,
-		"blob": wikiBlob,
-		"type": "wiki_blob",
+		"blob":       wikiBlob,
+		"type":       "wiki_blob",
 		"join_field": joinData})
+
 	return nil
 }
 
 func (i *Indexer) removeBlob(path string) error {
-	blobID := BlobID{ i.ProjectID, path }
+	log.Printf("Removing blob: %s", path)
+	blobID := BlobID{i.ProjectID, path}
 
 	i.Submitter.Remove(&blobID)
 	return nil

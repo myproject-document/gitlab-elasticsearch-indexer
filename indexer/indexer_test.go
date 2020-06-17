@@ -11,16 +11,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
-	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
+	H "gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/testhelpers"
 )
 
 const (
 	sha            = "9876543210987654321098765432109876543210"
 	oid            = "0123456789012345678901234567890123456789"
-	parentID       = indexer.ProjectID(667)
-	parentIDString = "667"
+	parentID       = H.ProjectID
+	parentIDString = H.ProjectIDString
 )
 
 type fakeSubmitter struct {
@@ -95,7 +96,7 @@ func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	submitter := &fakeSubmitter{}
 
 	return &indexer.Indexer{
-		ProjectID: parentID,
+		ProjectID:  parentID,
 		Repository: repo,
 		Submitter:  submitter,
 	}, repo, submitter
@@ -136,7 +137,7 @@ func gitCommit(message string) *git.Commit {
 func validBlob(file *git.File, content, language string) *indexer.Blob {
 	return &indexer.Blob{
 		Type:      "blob",
-		ID:        &indexer.BlobID{ parentID, file.Path },
+		ID:        &indexer.BlobID{parentID, file.Path},
 		OID:       oid,
 		RepoID:    parentIDString,
 		CommitSHA: sha,
@@ -150,7 +151,7 @@ func validBlob(file *git.File, content, language string) *indexer.Blob {
 func validCommit(gitCommit *git.Commit) *indexer.Commit {
 	return &indexer.Commit{
 		Type:      "commit",
-		ID:        &indexer.CommitID{ parentID, gitCommit.Hash },
+		ID:        &indexer.CommitID{parentID, gitCommit.Hash},
 		Author:    indexer.BuildPerson(gitCommit.Author),
 		Committer: indexer.BuildPerson(gitCommit.Committer),
 		RepoID:    parentIDString,

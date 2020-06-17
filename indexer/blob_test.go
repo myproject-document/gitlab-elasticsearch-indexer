@@ -12,7 +12,7 @@ import (
 func TestBuildBlob(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	expected := validBlob(file, "foo", "Text")
-	commitID := indexer.CommitID{ indexer.ProjectID(parentID), expected.CommitSHA }
+	commitID := indexer.CommitID{indexer.ProjectID(parentID), expected.CommitSHA}
 	actualBlob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestBuildBlob(t *testing.T) {
 func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	file.Size = 1024*1024 + 1
-	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	commitID := indexer.CommitID{indexer.ProjectID(parentID), sha}
 	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.Error(t, err, indexer.SkipTooLargeBlob)
@@ -46,7 +46,7 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 
 func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo\x00")
-	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	commitID := indexer.CommitID{indexer.ProjectID(parentID), sha}
 	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.Equal(t, err, indexer.SkipBinaryBlob)
@@ -55,7 +55,7 @@ func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 	file := gitFile("Makefile.am", "foo")
-	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	commitID := indexer.CommitID{indexer.ProjectID(parentID), sha}
 	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 	file := gitFile("foo.rb", "foo")
-	commitID := indexer.CommitID{ indexer.ProjectID(parentID), sha }
+	commitID := indexer.CommitID{indexer.ProjectID(parentID), sha}
 	blob, err := indexer.BuildBlob(file, commitID, "blob")
 
 	require.NoError(t, err)
@@ -72,7 +72,7 @@ func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 }
 
 func TestBlobIDRef(t *testing.T) {
-	blobID := indexer.BlobID{ 2147483648, "path" }
-	
+	blobID := indexer.BlobID{2147483648, "path"}
+
 	require.Equal(t, "2147483648_path", blobID.Ref())
 }

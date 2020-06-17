@@ -1,8 +1,6 @@
 package git_test
 
 import (
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -10,81 +8,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/context"
 
-	gitalyClient "gitlab.com/gitlab-org/gitaly/client"
-	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
+	H "gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/testhelpers"
 )
-
-var (
-	gitalyConnInfo *gitalyConnectionInfo
-)
-
-const (
-	projectID         = "667"
-	headSHA           = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
-	initialSHA        = "1a0b36b3cdad1d2ee32457c102a8c0b7056fa863"
-	testRepo          = "gitlab-org/gitlab-test.git"
-	testRepoPath      = "https://gitlab.com/gitlab-org/gitlab-test.git"
-	testRepoNamespace = "gitlab-org"
-)
-
-type gitalyConnectionInfo struct {
-	Address string `json:"address"`
-	Storage string `json:"storage"`
-}
-
-func init() {
-	gci, exists := os.LookupEnv("GITALY_CONNECTION_INFO")
-	if exists {
-		json.Unmarshal([]byte(gci), &gitalyConnInfo)
-	}
-}
-
-func ensureGitalyRepository(t *testing.T) error {
-	conn, err := gitalyClient.Dial(gitalyConnInfo.Address, gitalyClient.DefaultDialOpts)
-	if err != nil {
-		return fmt.Errorf("did not connect: %s", err)
-	}
-
-	namespace := pb.NewNamespaceServiceClient(conn)
-	repository := pb.NewRepositoryServiceClient(conn)
-
-	// Remove the repository if it already exists, for consistency
-	rmNsReq := &pb.RemoveNamespaceRequest{
-		StorageName: gitalyConnInfo.Storage,
-		Name:        testRepoNamespace,
-	}
-	_, err = namespace.RemoveNamespace(context.Background(), rmNsReq)
-	if err != nil {
-		return err
-	}
-
-	gl_repository := &pb.Repository{
-		StorageName:  gitalyConnInfo.Storage,
-		RelativePath: testRepo,
-	}
-
-	createReq := &pb.CreateRepositoryFromURLRequest{
-		Repository: gl_repository,
-		Url:        testRepoPath,
-	}
-
-	_, err = repository.CreateRepositoryFromURL(context.Background(), createReq)
-	if err != nil {
-		return err
-	}
-
-	writeHeadReq := &pb.WriteRefRequest{
-		Repository: gl_repository,
-		Ref:        []byte("refs/heads/master"),
-		Revision:   []byte("b83d6e391c22777fca1ed3012fce84f633d7fed0"),
-	}
-
-	_, err = repository.WriteRef(context.Background(), writeHeadReq)
-	return err
-}
 
 func checkDeps(t *testing.T) {
 	if os.Getenv("GITALY_CONNECTION_INFO") == "" {
@@ -107,9 +34,10 @@ func runEachCommit(repo git.Repository) (map[string]*git.Commit, []string, error
 
 func TestEachCommit(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
+	_, err := H.EnsureGitalyRepository(t)
+	require.NoError(t, err)
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "", headSHA)
+	repo, err := git.NewGitalyClientFromEnv(H.TestRepo, "", H.HeadSHA)
 	require.NoError(t, err)
 
 	commits, commitHashes, err := runEachCommit(repo)
@@ -162,7 +90,7 @@ func TestEachCommit(t *testing.T) {
 	require.Equal(t, expectedCommits, commitHashes)
 
 	// Now choose one commit and check it in detail
-	commit := commits[initialSHA]
+	commit := commits[H.InitialSHA]
 	date, err := time.Parse("Mon Jan 02 15:04:05 2006 -0700", "Thu Feb 27 10:03:18 2014 +0200")
 	require.NoError(t, err)
 
@@ -172,69 +100,23 @@ func TestEachCommit(t *testing.T) {
 		When:  date.Local(),
 	}
 
-	require.Equal(t, initialSHA, commit.Hash)
+	require.Equal(t, H.InitialSHA, commit.Hash)
 	require.Equal(t, "Initial commit\n", commit.Message)
 	require.Equal(t, dmitriy, commit.Author)
 	require.Equal(t, dmitriy, commit.Author)
 }
 
-func TestEachCommitGivenRangeOf3Commits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
-	require.NoError(t, err)
-
-	_, commitHashes, err := runEachCommit(repo)
-	require.NoError(t, err)
-
-	expected := []string{"498214de67004b1da3d820901307bed2a68a8ef6", headSHA}
-	sort.Strings(expected)
-	sort.Strings(commitHashes)
-
-	require.Equal(t, expected, commitHashes)
-}
-
-func TestEachCommitGivenRangeOf2Commits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
-	require.NoError(t, err)
-
-	_, commitHashes, err := runEachCommit(repo)
-	require.NoError(t, err)
-
-	require.Equal(t, []string{headSHA}, commitHashes)
-}
-
-func TestEachCommitGivenRangeOf1Commit(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, headSHA, headSHA)
-	require.NoError(t, err)
-
-	_, commitHashes, err := runEachCommit(repo)
-	require.NoError(t, err)
-	require.Equal(t, []string{}, commitHashes)
-}
-
 func TestEmptyToSHADefaultsToHeadSHA(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
+	_, err := H.EnsureGitalyRepository(t)
+	require.NoError(t, err)
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", "")
+	repo, err := git.NewGitalyClientFromEnv(H.TestRepo, "498214de67004b1da3d820901307bed2a68a8ef6", "")
 	require.NoError(t, err)
 
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
-	require.Equal(t, []string{headSHA}, commitHashes)
-}
-
-func TestEachCommitGivenASandwichRange(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
+	require.Equal(t, []string{H.HeadSHA}, commitHashes)
 }
 
 func runEachFileChange(repo git.Repository) (map[string]*git.File, []string, []string, error) {
@@ -260,9 +142,10 @@ func runEachFileChange(repo git.Repository) (map[string]*git.File, []string, []s
 
 func TestEachFileChangeAllModifications(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
+	_, err := H.EnsureGitalyRepository(t)
+	require.NoError(t, err)
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "", headSHA)
+	repo, err := git.NewGitalyClientFromEnv(H.TestRepo, "", H.HeadSHA)
 	require.NoError(t, err)
 
 	putFiles, _, filePaths, err := runEachFileChange(repo)
@@ -330,36 +213,40 @@ func TestEachFileChangeAllModifications(t *testing.T) {
 
 func TestEachFileChangeGivenRangeOfThreeCommits(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
+	_, err := H.EnsureGitalyRepository(t)
 	require.NoError(t, err)
 
-	_, _, filePaths, err := runEachFileChange(repo)
+	client, err := git.NewGitalyClientFromEnv(H.TestRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", H.HeadSHA)
+	require.NoError(t, err)
+
+	_, _, filePaths, err := runEachFileChange(client)
 
 	require.Equal(t, []string{"bar/branch-test.txt"}, filePaths)
 }
 
 func TestEachFileChangeGivenRangeOfTwoCommits(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
+	_, err := H.EnsureGitalyRepository(t)
 	require.NoError(t, err)
 
-	_, _, filePaths, err := runEachFileChange(repo)
+	client, err := git.NewGitalyClientFromEnv(H.TestRepo, "498214de67004b1da3d820901307bed2a68a8ef6", H.HeadSHA)
+	require.NoError(t, err)
+
+	_, _, filePaths, err := runEachFileChange(client)
 
 	require.Equal(t, []string{}, filePaths)
 }
 
 func TestEachFileChangeWithRename(t *testing.T) {
 	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
+	repository, err := H.EnsureGitalyRepository(t)
+	require.NoError(t, err)
+	require.NoError(t, H.ResetHead(repository, "c347ca2e140aa667b968e51ed0ffe055501fe4f4"))
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "19e2e9b4ef76b422ce1154af39a91323ccc57434", "c347ca2e140aa667b968e51ed0ffe055501fe4f4")
+	client, err := git.NewGitalyClientFromEnv(H.TestRepo, "19e2e9b4ef76b422ce1154af39a91323ccc57434", "")
 	require.NoError(t, err)
 
-	putFiles, delFiles, _, err := runEachFileChange(repo)
+	putFiles, delFiles, _, err := runEachFileChange(client)
 
 	require.Contains(t, putFiles, "files/js/commit.coffee")
 	require.Contains(t, delFiles, "files/js/commit.js.coffee")
