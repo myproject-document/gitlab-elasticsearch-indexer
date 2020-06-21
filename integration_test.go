@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -26,14 +27,16 @@ var (
 func TestIndexingRenamesFiles(t *testing.T) {
 	checkDeps(t)
 	repository, err := H.EnsureGitalyRepository(t)
-	c := buildWorkingIndex(t)
+	client, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	// The commit before files/js/commit.js.coffee is renamed
 	H.ResetHead(repository, "281d3a76f31c812dbf48abce82ccf6860adedd81")
 	err, _, _ = run(H.InitialSHA)
 	require.NoError(t, err)
 
-	_, err = fetchBlob(c, "files/js/commit.js.coffee")
+	_, err = fetchBlob(client, "files/js/commit.js.coffee")
 	require.NoError(t, err)
 
 	// The commit that renames files/js/commit.js.coffee → files/js/commit.coffee
@@ -42,9 +45,9 @@ func TestIndexingRenamesFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now we expect it to have been renamed
-	_, err = fetchBlob(c, "files/js/commit.js.coffee")
+	_, err = fetchBlob(client, "files/js/commit.js.coffee")
 	require.Error(t, err)
-	_, err = fetchBlob(c, "files/js/commit.coffee")
+	_, err = fetchBlob(client, "files/js/commit.coffee")
 	require.NoError(t, err)
 }
 
@@ -66,23 +69,21 @@ func checkDeps(t *testing.T) {
 	}
 }
 
-func buildWorkingIndex(t *testing.T) *elastic.Client {
+func buildWorkingIndex(t *testing.T) (*elastic.Client, func()) {
 	return buildIndex(t, true)
 }
 
-func buildBrokenIndex(t *testing.T) *elastic.Client {
+func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
 	return buildIndex(t, false)
 }
 
-func buildIndex(t *testing.T, working bool) *elastic.Client {
+func buildIndex(t *testing.T, working bool) (client *elastic.Client, cleanup func()) {
 	setElasticsearchConnectionInfo(t)
 
 	client, err := elastic.FromEnv()
 	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		require.NoError(t, client.DeleteIndex())
-	})
+	
+	cleanup = func() { require.NoError(t, client.DeleteIndex()) }
 
 	if working {
 		require.NoError(t, client.CreateWorkingIndex())
@@ -90,7 +91,7 @@ func buildIndex(t *testing.T, working bool) *elastic.Client {
 		require.NoError(t, client.CreateBrokenIndex())
 	}
 
-	return client
+	return
 }
 
 // Substitude index_name with a dynamically generated one
@@ -156,14 +157,16 @@ func run(from string, args ...string) (error, string, string) {
 func TestIndexingRemovesFiles(t *testing.T) {
 	checkDeps(t)
 	repository, err := H.EnsureGitalyRepository(t)
-	c := buildWorkingIndex(t)
+	client, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	// The commit before files/empty is removed - so it should be indexed
 	H.ResetHead(repository, "9a944d90955aaf45f6d0c88f30e27f8d2c41cec0")
 
 	err, _, _ = run(H.InitialSHA)
 	require.NoError(t, err)
-	_, err = fetchBlob(c, "files/empty")
+	_, err = fetchBlob(client, "files/empty")
 	require.NoError(t, err)
 
 	// Reset HEAD back to a commit that removes files
@@ -172,7 +175,7 @@ func TestIndexingRemovesFiles(t *testing.T) {
 	// Now we expect it to have been removed
 	err, _, _ = run("19e2e9b4ef76b422ce1154af39a91323ccc57434")
 	require.NoError(t, err)
-	_, err = fetchBlob(c, "files/empty")
+	_, err = fetchBlob(client, "files/empty")
 	require.Error(t, err)
 }
 
@@ -187,7 +190,9 @@ type document struct {
 func TestIndexingTranscodesToUTF8(t *testing.T) {
 	checkDeps(t)
 	H.EnsureGitalyRepository(t)
-	c := buildWorkingIndex(t)
+	client, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	err, _, _ := run("")
 	require.NoError(t, err)
@@ -201,7 +206,7 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 		{"SHIFT_JIS", "encoding/test.txt", "これはテストです。\nこれもマージして下さい。\n\nAdd excel file.\nDelete excel file."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			blob, err := fetchBlob(c, tc.path)
+			blob, err := fetchBlob(client, tc.path)
 			require.NoError(t, err)
 
 			blobDoc := &document{}
@@ -215,7 +220,9 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 func TestElasticClientIndexMismatch(t *testing.T) {
 	checkDeps(t)
 	H.EnsureGitalyRepository(t)
-	buildBrokenIndex(t)
+	_, cleanup := buildBrokenIndex(t)
+
+	defer cleanup()
 
 	err, _, stderr := run("")
 
@@ -226,13 +233,15 @@ func TestElasticClientIndexMismatch(t *testing.T) {
 func TestIndexingGitlabTest(t *testing.T) {
 	checkDeps(t)
 	H.EnsureGitalyRepository(t)
-	c := buildWorkingIndex(t)
+	client, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	err, _, _ := run("")
 	require.NoError(t, err)
 
 	// Check the indexing of a commit
-	commit, err := fetchCommit(c, H.HeadSHA)
+	commit, err := fetchCommit(client, H.HeadSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
 	require.Equal(t, "doc", commit.Type)
@@ -270,7 +279,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 	)
 
 	// Check the indexing of a text blob
-	blob, err := fetchBlob(c, "README.md")
+	blob, err := fetchBlob(client, "README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)
@@ -298,11 +307,11 @@ func TestIndexingGitlabTest(t *testing.T) {
 	)
 
 	// Check that a binary blob isn't indexed
-	_, err = fetchBlob(c, "Gemfile.zip")
+	_, err = fetchBlob(client, "Gemfile.zip")
 	require.Error(t, err)
 
 	// Test that timezones are preserved
-	commit, err = fetchCommit(c, "498214de67004b1da3d820901307bed2a68a8ef6")
+	commit, err = fetchCommit(client, "498214de67004b1da3d820901307bed2a68a8ef6")
 	require.NoError(t, err)
 
 	cDoc := &document{}
@@ -319,18 +328,20 @@ func TestIndexingGitlabTest(t *testing.T) {
 func TestIndexingWikiBlobs(t *testing.T) {
 	checkDeps(t)
 	H.EnsureGitalyRepository(t)
-	c := buildWorkingIndex(t)
+	client, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	err, _, _ := run("", "--blob-type=wiki_blob", "--skip-commits")
 	require.NoError(t, err)
 
 	// Check that commits were not indexed
-	commit, err := fetchCommit(c, H.HeadSHA)
+	commit, err := fetchCommit(client, H.HeadSHA)
 	require.Error(t, err)
 	require.Empty(t, commit)
 
 	// Check that blobs are indexed
-	blob, err := fetchBlob(c, "README.md")
+	blob, err := fetchBlob(client, "README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
 	require.Equal(t, "doc", blob.Type)
@@ -377,6 +388,7 @@ func TestInputFile(t *testing.T) {
 		require.NoError(t, err)
 
 		defer operationsFile.Close()
+		defer operationsFile.Sync()
 
 		for i, repository := range repositories {
 			operationSpec := fmt.Sprintf("%d\t%s\t%s\n", 1+i, repository.RelativePath, EmptySHA)
@@ -384,7 +396,11 @@ func TestInputFile(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		operationsFile.Sync()
+		if os.Getenv("DEBUG") != "" {
+			fmt.Println("=== INPUT-FILE ===")
+			operationsFile.Seek(0, 0)
+			io.Copy(os.Stdout, operationsFile)
+		}
 	}
 
 	defer os.Remove(OperationsFilePath)
@@ -397,7 +413,9 @@ func TestInputFile(t *testing.T) {
 func TestStdoutOperationResult(t *testing.T) {
 	checkDeps(t)
 	H.EnsureGitalyRepository(t)
-	buildWorkingIndex(t)
+	_, cleanup := buildWorkingIndex(t)
+
+	defer cleanup()
 
 	err, stdout, _ := run("", "--blob-type=blob", "--skip-commits")
 	require.NoError(t, err)

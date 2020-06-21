@@ -167,20 +167,19 @@ func setupTestClient(t *testing.T) *elastic.Client {
 	return client
 }
 
-func setupTestClientAndCreateIndex(t *testing.T) *elastic.Client {
-	client := setupTestClient(t)
-
-	t.Cleanup(func() {
-		require.NoError(t, client.DeleteIndex())
-	})
-
+func setupTestClientAndCreateIndex(t *testing.T) (client *elastic.Client, cleanup func()) {
+	client = setupTestClient(t)
 	require.NoError(t, client.CreateWorkingIndex())
 
-	return client
+	cleanup = func() { require.NoError(t, client.DeleteIndex()) }
+
+	return 
 }
 
 func TestElasticClientIndexAndRetrieval(t *testing.T) {
-	client := setupTestClientAndCreateIndex(t)
+	client, cleanup := setupTestClientAndCreateIndex(t)
+
+	defer cleanup()
 
 	blobDoc := map[string]interface{}{}
 	blobID := DocumentID{projectIDString, projectIDString + "_foo"}
