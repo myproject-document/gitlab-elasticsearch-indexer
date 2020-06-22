@@ -32,8 +32,8 @@ workflow:
   script:
     - apt-get update && apt-get -yy install libicu-dev
     - make format
-    - make cover
     - make
+    - make cover
     - make test
 
 .test-es64:
