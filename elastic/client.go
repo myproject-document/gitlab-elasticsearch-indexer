@@ -16,10 +16,12 @@ import (
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/deoxxa/aws_signing_client"
 	"github.com/olivere/elastic"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 var (
-	timeoutError = fmt.Errorf("Timeout")
+	timeoutError        = fmt.Errorf("Timeout")
+	envCorrelationIDKey = "CORRELATION_ID"
 )
 
 type Client struct {
@@ -102,6 +104,12 @@ func NewClient(config *Config) (*Client, error) {
 			opts = append(opts, elastic.SetScheme("https"))
 			break
 		}
+	}
+
+	if correlationId, err := generateCorrelationID(); err == nil {
+		headers := http.Header{}
+		headers.Add("X-Opaque-Id", correlationId)
+		opts = append(opts, elastic.SetHeaders(headers))
 	}
 
 	opts = append(opts, elastic.SetURL(config.URL...), elastic.SetSniff(false))
@@ -211,4 +219,18 @@ func (c *Client) Remove(id string) {
 		Id(id)
 
 	c.bulk.Add(req)
+}
+
+func generateCorrelationID() (string, error) {
+	var err error
+
+	cid := os.Getenv(envCorrelationIDKey)
+	if cid == "" {
+		if cid, err = correlation.RandomID(); err != nil {
+			log.Printf("Unable to generate random correlation ID: %v", err)
+			return "", err
+		}
+	}
+
+	return cid, nil
 }

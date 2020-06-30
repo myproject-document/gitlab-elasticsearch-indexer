@@ -237,3 +237,37 @@ func TestElasticReadConfigCustomBulkSettings(t *testing.T) {
 	require.Equal(t, 6, config.BulkWorkers)
 
 }
+
+func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
+	os.Setenv("CORRELATION_ID", "the-correlation-id")
+
+	var req *http.Request
+
+	f := func(w http.ResponseWriter, r *http.Request) {
+		req = r
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(f))
+	defer srv.Close()
+
+	config, err := elastic.ReadConfig(strings.NewReader(
+		`{
+			"url":["` + srv.URL + `"]
+		}`,
+	))
+	require.NoError(t, err)
+	config.ProjectID = projectID
+
+	client, err := elastic.NewClient(config)
+	require.NoError(t, err)
+
+	blobDoc := map[string]interface{}{}
+	client.Index(projectIDString+"_foo", blobDoc)
+	require.NoError(t, client.Flush())
+
+	require.NotNil(t, req)
+	require.Equal(t, "the-correlation-id", req.Header.Get("X-Opaque-Id"))
+}
