@@ -129,7 +129,7 @@ func TestAWSConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	config.ProjectID = 633
 
-	client, err := elastic.NewClient(config)
+	client, err := elastic.NewClient(config, "the-correlation-id")
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -148,7 +148,7 @@ func setupTestClient(t *testing.T) *elastic.Client {
 
 	os.Setenv("RAILS_ENV", fmt.Sprintf("test-elastic-%d", time.Now().Unix()))
 
-	client, err := elastic.FromEnv(projectID)
+	client, err := elastic.FromEnv(projectID, "test-correlation-id")
 	require.NoError(t, err)
 
 	require.Equal(t, projectID, client.ParentID())
@@ -239,8 +239,6 @@ func TestElasticReadConfigCustomBulkSettings(t *testing.T) {
 }
 
 func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
-	os.Setenv("CORRELATION_ID", "the-correlation-id")
-
 	var req *http.Request
 
 	f := func(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +259,7 @@ func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
 	require.NoError(t, err)
 	config.ProjectID = projectID
 
-	client, err := elastic.NewClient(config)
+	client, err := elastic.NewClient(config, "the-correlation-id")
 	require.NoError(t, err)
 
 	blobDoc := map[string]interface{}{}

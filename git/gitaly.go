@@ -30,8 +30,7 @@ const (
 	NullTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 	ZeroSHA     = "0000000000000000000000000000000000000000"
 
-	envCorrelationIDKey = "CORRELATION_ID"
-	clientName          = "gitlab-elasticsearch-indexer"
+	clientName = "gitlab-elasticsearch-indexer"
 )
 
 type StorageConfig struct {
@@ -54,7 +53,7 @@ type gitalyClient struct {
 	ToHash                  string
 }
 
-func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClient, error) {
+func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
 	var RPCCred credentials.PerRPCCredentials
 	if config.TokenVersion == 0 || config.TokenVersion == 2 {
 		RPCCred = gitalyauth.RPCCredentialsV2(config.Token)
@@ -77,10 +76,7 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 		),
 	)
 
-	ctx, err := newContext()
-	if err != nil {
-		return nil, err
-	}
+	ctx := newContext(correlationID)
 
 	conn, err := gitalyclient.Dial(config.Address, connOpts)
 	if err != nil {
@@ -121,7 +117,7 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA string) (*gitalyClien
 	return client, nil
 }
 
-func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA string) (*gitalyClient, error) {
+func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
 	data := strings.NewReader(os.Getenv("GITALY_CONNECTION_INFO"))
 
 	config := StorageConfig{RelativePath: projectPath}
@@ -130,7 +126,7 @@ func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA string) (*gitalyClient, 
 		return nil, err
 	}
 
-	client, err := NewGitalyClient(&config, fromSHA, toSHA)
+	client, err := NewGitalyClient(&config, fromSHA, toSHA, correlationID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s: %s", config.RelativePath, err)
 	}
@@ -330,24 +326,6 @@ func gitalyBuildSignature(ca *pb.CommitAuthor) Signature {
 	}
 }
 
-func generateCorrelationID() (string, error) {
-	var err error
-
-	cid := os.Getenv(envCorrelationIDKey)
-	if cid == "" {
-		if cid, err = correlation.RandomID(); err != nil {
-			log.Error("Unable to generate random correlation ID: ", err)
-			return "", err
-		}
-	}
-
-	return cid, nil
-}
-
-func newContext() (context.Context, error) {
-	cid, err := generateCorrelationID()
-	if err != nil {
-		return nil, err
-	}
-	return correlation.ContextWithCorrelation(context.Background(), cid), nil
+func newContext(correlationID string) context.Context {
+	return correlation.ContextWithCorrelation(context.Background(), correlationID)
 }
