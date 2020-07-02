@@ -19,7 +19,8 @@ import (
 )
 
 var (
-	timeoutError = fmt.Errorf("Timeout")
+	timeoutError        = fmt.Errorf("Timeout")
+	envCorrelationIDKey = "CORRELATION_ID"
 )
 
 type Client struct {
@@ -33,7 +34,7 @@ type Client struct {
 
 // FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
 // environment variable
-func FromEnv(projectID int64) (*Client, error) {
+func FromEnv(projectID int64, correlationID string) (*Client, error) {
 	data := strings.NewReader(os.Getenv("ELASTIC_CONNECTION_INFO"))
 
 	config, err := ReadConfig(data)
@@ -52,7 +53,7 @@ func FromEnv(projectID int64) (*Client, error) {
 
 	config.ProjectID = projectID
 
-	return NewClient(config)
+	return NewClient(config, correlationID)
 }
 
 func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
@@ -78,7 +79,7 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 	}
 }
 
-func NewClient(config *Config) (*Client, error) {
+func NewClient(config *Config, correlationID string) (*Client, error) {
 	var opts []elastic.ClientOptionFunc
 
 	// AWS settings have to come first or they override custom URL, etc
@@ -103,6 +104,10 @@ func NewClient(config *Config) (*Client, error) {
 			break
 		}
 	}
+
+	headers := http.Header{}
+	headers.Add("X-Opaque-Id", correlationID)
+	opts = append(opts, elastic.SetHeaders(headers))
 
 	opts = append(opts, elastic.SetURL(config.URL...), elastic.SetSniff(false))
 

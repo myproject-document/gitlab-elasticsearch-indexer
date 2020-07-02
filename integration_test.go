@@ -116,7 +116,7 @@ func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
 func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 	setElasticsearchConnectionInfo(t)
 
-	client, err := elastic.FromEnv(projectID)
+	client, err := elastic.FromEnv(projectID, "the-correlation-id")
 	require.NoError(t, err)
 
 	if working {

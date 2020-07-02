@@ -129,7 +129,7 @@ func TestAWSConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	config.ProjectID = 633
 
-	client, err := elastic.NewClient(config)
+	client, err := elastic.NewClient(config, "the-correlation-id")
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -148,7 +148,7 @@ func setupTestClient(t *testing.T) *elastic.Client {
 
 	os.Setenv("RAILS_ENV", fmt.Sprintf("test-elastic-%d", time.Now().Unix()))
 
-	client, err := elastic.FromEnv(projectID)
+	client, err := elastic.FromEnv(projectID, "test-correlation-id")
 	require.NoError(t, err)
 
 	require.Equal(t, projectID, client.ParentID())
@@ -236,4 +236,36 @@ func TestElasticReadConfigCustomBulkSettings(t *testing.T) {
 	require.Equal(t, 1024, config.MaxBulkSize)
 	require.Equal(t, 6, config.BulkWorkers)
 
+}
+
+func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
+	var req *http.Request
+
+	f := func(w http.ResponseWriter, r *http.Request) {
+		req = r
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(f))
+	defer srv.Close()
+
+	config, err := elastic.ReadConfig(strings.NewReader(
+		`{
+			"url":["` + srv.URL + `"]
+		}`,
+	))
+	require.NoError(t, err)
+	config.ProjectID = projectID
+
+	client, err := elastic.NewClient(config, "the-correlation-id")
+	require.NoError(t, err)
+
+	blobDoc := map[string]interface{}{}
+	client.Index(projectIDString+"_foo", blobDoc)
+	require.NoError(t, client.Flush())
+
+	require.NotNil(t, req)
+	require.Equal(t, "the-correlation-id", req.Header.Get("X-Opaque-Id"))
 }

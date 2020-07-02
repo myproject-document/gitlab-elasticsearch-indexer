@@ -47,28 +47,9 @@ func TestNewGitalyClientWithContextID(t *testing.T) {
 
 	testConfig := getConfig(listener.Addr().String())
 
-	os.Setenv(envCorrelationIDKey, "random-cid")
-
-	client, err := NewGitalyClient(testConfig, testFromCommitSHA, testToCommitSHA)
+	client, err := NewGitalyClient(testConfig, testFromCommitSHA, testToCommitSHA, "the-correlation-id")
 	r.NoError(err)
 	r.NotNil(client)
 
-	r.Equal("random-cid", correlation.ExtractFromContext(client.ctx))
-}
-
-func TestNewGitalyClientNoContextID(t *testing.T) {
-	r := require.New(t)
-
-	listener, err := startUnixSocketListener()
-	r.NoError(err)
-	defer listener.Close()
-
-	testConfig := getConfig(listener.Addr().String())
-
-	client, err := NewGitalyClient(testConfig, testFromCommitSHA, testToCommitSHA)
-	r.NoError(err)
-	r.NotNil(client)
-
-	//Random Correlation ID will be generaated when it's not in the client context
-	r.NotEmpty(correlation.ExtractFromContext(client.ctx))
+	r.Equal("the-correlation-id", correlation.ExtractFromContext(client.ctx))
 }

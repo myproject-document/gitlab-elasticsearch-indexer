@@ -9,6 +9,7 @@ import (
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
+	"gitlab.com/gitlab-org/labkit/correlation"
 )
 
 var (
@@ -19,6 +20,8 @@ var (
 	// Overriden in the makefile
 	Version   = "dev"
 	BuildTime = ""
+
+	envCorrelationIDKey = "CORRELATION_ID"
 )
 
 func main() {
@@ -47,13 +50,14 @@ func main() {
 	toSHA := os.Getenv("TO_SHA")
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
+	correlationID := generateCorrelationID()
 
-	repo, err := git.NewGitalyClientFromEnv(projectPath, fromSHA, toSHA)
+	repo, err := git.NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	esClient, err := elastic.FromEnv(projectID)
+	esClient, err := elastic.FromEnv(projectID, correlationID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,4 +92,19 @@ func configureLogger() {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
+}
+
+func generateCorrelationID() string {
+	var err error
+
+	cid := os.Getenv(envCorrelationIDKey)
+	if cid == "" {
+		if cid, err = correlation.RandomID(); err != nil {
+			// Should never happen since correlation.RandomID() should not fail,
+			// but if it does we return empty string, which is fine.
+			log.Error("Unable to generate random correlation ID: ", err)
+		}
+	}
+
+	return cid
 }
