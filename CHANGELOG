@@ -1,5 +1,10 @@
 # GitLab Elasticsearch Indexer
 
+## v2.4.0
+
+- Send correlation ID to Elasticsearch as X-Opaque-Id !78
+- Add support of using AWS ECS credential provider !77
+
 ## v2.3.0
 
 - Process status 413 Request Entity Too Large !65
