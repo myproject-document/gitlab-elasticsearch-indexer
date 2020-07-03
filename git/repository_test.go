@@ -106,12 +106,18 @@ func runEachCommit(repo git.Repository) (map[string]*git.Commit, []string, error
 	return commits, commitHashes, err
 }
 
-func TestEachCommit(t *testing.T) {
+func setupTestRepository(t *testing.T, fromSha, toSha string) git.Repository {
 	checkDeps(t)
 	require.NoError(t, ensureGitalyRepository(t))
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "", headSHA, "the-correlation-id")
+	repo, err := git.NewGitalyClientFromEnv(testRepo, fromSha, toSha, "the-correlation-id")
 	require.NoError(t, err)
+
+	return repo
+}
+
+func TestEachCommit(t *testing.T) {
+	repo := setupTestRepository(t, "", headSHA)
 
 	commits, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
@@ -181,11 +187,7 @@ func TestEachCommit(t *testing.T) {
 }
 
 func TestEachCommitGivenRangeOf3Commits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
 
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
@@ -198,11 +200,7 @@ func TestEachCommitGivenRangeOf3Commits(t *testing.T) {
 }
 
 func TestEachCommitGivenRangeOf2Commits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
 
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
@@ -211,11 +209,7 @@ func TestEachCommitGivenRangeOf2Commits(t *testing.T) {
 }
 
 func TestEachCommitGivenRangeOf1Commit(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, headSHA, headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, headSHA, headSHA)
 
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
@@ -223,11 +217,7 @@ func TestEachCommitGivenRangeOf1Commit(t *testing.T) {
 }
 
 func TestEmptyToSHADefaultsToHeadSHA(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", "", "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "498214de67004b1da3d820901307bed2a68a8ef6", "")
 
 	_, commitHashes, err := runEachCommit(repo)
 	require.NoError(t, err)
@@ -256,11 +246,7 @@ func runEachFileChange(repo git.Repository) (map[string]*git.File, []string, []s
 }
 
 func TestEachFileChangeAllModifications(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "", headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "", headSHA)
 
 	putFiles, _, filePaths, err := runEachFileChange(repo)
 	require.NoError(t, err)
@@ -326,37 +312,28 @@ func TestEachFileChangeAllModifications(t *testing.T) {
 }
 
 func TestEachFileChangeGivenRangeOfThreeCommits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "1b12f15a11fc6e62177bef08f47bc7b5ce50b141", headSHA)
 
 	_, _, filePaths, err := runEachFileChange(repo)
+	require.NoError(t, err)
 
 	require.Equal(t, []string{"bar/branch-test.txt"}, filePaths)
 }
 
 func TestEachFileChangeGivenRangeOfTwoCommits(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA, "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "498214de67004b1da3d820901307bed2a68a8ef6", headSHA)
 
 	_, _, filePaths, err := runEachFileChange(repo)
+	require.NoError(t, err)
 
 	require.Equal(t, []string{}, filePaths)
 }
 
 func TestEachFileChangeWithRename(t *testing.T) {
-	checkDeps(t)
-	require.NoError(t, ensureGitalyRepository(t))
-
-	repo, err := git.NewGitalyClientFromEnv(testRepo, "19e2e9b4ef76b422ce1154af39a91323ccc57434", "c347ca2e140aa667b968e51ed0ffe055501fe4f4", "the-correlation-id")
-	require.NoError(t, err)
+	repo := setupTestRepository(t, "19e2e9b4ef76b422ce1154af39a91323ccc57434", "c347ca2e140aa667b968e51ed0ffe055501fe4f4")
 
 	putFiles, delFiles, _, err := runEachFileChange(repo)
+	require.NoError(t, err)
 
 	require.Contains(t, putFiles, "files/js/commit.coffee")
 	require.Contains(t, delFiles, "files/js/commit.js.coffee")
