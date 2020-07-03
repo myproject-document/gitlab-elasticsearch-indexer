@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/stretchr/testify/require"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
@@ -38,6 +39,14 @@ const credsFailRespTmpl = `{
   "LastUpdated": "2009-11-23T0:00:00Z"
 }`
 
+type testResolver struct {
+	endpoint string
+}
+
+func (tr testResolver) EndpointFor(service, region string, opts ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+	return endpoints.ResolvedEndpoint{URL: tr.endpoint}, nil
+}
+
 func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -58,7 +67,9 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 }
 
 func TestResolveAWSCredentialsStatic(t *testing.T) {
-	aws_config := &aws.Config{}
+	require := require.New(t)
+
+	awsConfig := &aws.Config{}
 	config, err := elastic.ReadConfig(strings.NewReader(
 		`{
 			"url":["http://localhost:9200"],
@@ -68,19 +79,22 @@ func TestResolveAWSCredentialsStatic(t *testing.T) {
 		}`,
 	))
 
-	creds := elastic.ResolveAWSCredentials(config, aws_config)
+	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
-	require.Nil(t, err, "Expect no error, %v", err)
-	require.Equal(t, "static_access_key", credsValue.AccessKeyID, "Expect access key ID to match")
-	require.Equal(t, "static_secret_access_key", credsValue.SecretAccessKey, "Expect secret access key to match")
+	require.NoError(err)
+	require.Nil(err, "Expect no error, %v", err)
+	require.Equal("static_access_key", credsValue.AccessKeyID, "Expect access key ID to match")
+	require.Equal("static_secret_access_key", credsValue.SecretAccessKey, "Expect secret access key to match")
 }
 
 func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
+	require := require.New(t)
+
 	server := initTestServer("2014-12-16T01:51:37Z", false)
 	defer server.Close()
 
-	aws_config := &aws.Config{
-		Endpoint: aws.String(server.URL + "/latest"),
+	awsConfig := &aws.Config{
+		EndpointResolver: testResolver{endpoint: server.URL + "/latest"},
 	}
 
 	config, err := elastic.ReadConfig(strings.NewReader(
@@ -92,11 +106,42 @@ func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
 		}`,
 	))
 
-	creds := elastic.ResolveAWSCredentials(config, aws_config)
+	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
-	require.Nil(t, err, "Expect no error, %v", err)
-	require.Equal(t, "accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
-	require.Equal(t, "secret", credsValue.SecretAccessKey, "Expect secret access key to match")
+	require.NoError(err)
+	require.Nil(err, "Expect no error, %v", err)
+	require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
+	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
+}
+
+func TestResolveAWSCredentialsECSCredsProvider(t *testing.T) {
+	require := require.New(t)
+
+	server := initTestServer("2014-12-16T01:51:37Z", false)
+	defer server.Close()
+
+	awsConfig := &aws.Config{
+		HTTPClient: &http.Client{},
+	}
+
+	config, err := elastic.ReadConfig(strings.NewReader(
+		`{
+			"url":["` + server.URL + `"],
+			"aws":true,
+			"aws_region":"us-east-1",
+			"aws_profile":"test_aws_will_not_find"
+		}`,
+	))
+
+	os.Setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", server.URL+"/latest/meta-data/iam/security-credentials/RoleName")
+	defer os.Unsetenv("AWS_CONTAINER_CREDENTIALS_FULL_URI")
+
+	creds := elastic.ResolveAWSCredentials(config, awsConfig)
+	credsValue, err := creds.Get()
+	require.NoError(err)
+	require.Nil(err, "Expect no error, %v", err)
+	require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
+	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
 }
 
 func TestAWSConfiguration(t *testing.T) {

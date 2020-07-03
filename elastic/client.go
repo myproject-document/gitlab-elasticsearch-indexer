@@ -10,9 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/aws/defaults"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/deoxxa/aws_signing_client"
 	"github.com/olivere/elastic"
@@ -84,10 +82,11 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 
 	// AWS settings have to come first or they override custom URL, etc
 	if config.AWS {
-		aws_config := &aws.Config{
-			Region: aws.String(config.Region),
+		awsConfig := &aws.Config{
+			Region:     aws.String(config.Region),
+			HTTPClient: &http.Client{},
 		}
-		credentials := ResolveAWSCredentials(config, aws_config)
+		credentials := ResolveAWSCredentials(config, awsConfig)
 		signer := v4.NewSigner(credentials)
 		awsClient, err := aws_signing_client.New(signer, &http.Client{}, "es", config.Region)
 		if err != nil {
@@ -142,23 +141,20 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 //
 // Order of resolution
 // 1.  Static Credentials - As configured in Indexer config
-// 2.  EC2 Instance Role Credentials
-func ResolveAWSCredentials(config *Config, aws_config *aws.Config) *credentials.Credentials {
-	sess := session.Must(session.NewSession(aws_config))
-	creds := credentials.NewChainCredentials(
-		[]credentials.Provider{
-			&credentials.StaticProvider{
-				Value: credentials.Value{
-					AccessKeyID:     config.AccessKey,
-					SecretAccessKey: config.SecretKey,
-				},
-			},
-			&ec2rolecreds.EC2RoleProvider{
-				Client: ec2metadata.New(sess),
+// 2.  IAM Role Based Credentials
+//     2a.  ECS Role Credentials
+//     2b.  EC2 Instance Role Credentials
+func ResolveAWSCredentials(config *Config, awsConfig *aws.Config) *credentials.Credentials {
+	providers := []credentials.Provider{
+		&credentials.StaticProvider{
+			Value: credentials.Value{
+				AccessKeyID:     config.AccessKey,
+				SecretAccessKey: config.SecretKey,
 			},
 		},
-	)
-	return creds
+		defaults.RemoteCredProvider(*awsConfig, defaults.Handlers()),
+	}
+	return credentials.NewChainCredentials(providers)
 }
 
 func (c *Client) ParentID() int64 {
