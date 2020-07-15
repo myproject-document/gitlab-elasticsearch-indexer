@@ -13,6 +13,7 @@ workflow:
 
 include:
   - template: Security/Dependency-Scanning.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
 
 .go-cache:
   variables:
@@ -127,3 +128,8 @@ code_navigation:
   artifacts:
     reports:
       lsif: dump.lsif
+
+gosec-sast:
+  before_script:
+    - apk add make pkgconfig icu-dev
+    - make install
