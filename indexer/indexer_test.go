@@ -22,6 +22,10 @@ const (
 	parentIDString = "667"
 )
 
+func setupEncoder() *indexer.Encoder {
+	return indexer.NewEncoder(1024 * 1024)
+}
+
 type fakeSubmitter struct {
 	flushed int
 
@@ -92,6 +96,9 @@ func (r *fakeRepository) EachCommit(f git.CommitFunc) error {
 
 	return nil
 }
+func (r *fakeRepository) GetLimitFileSize() int64 {
+	return 1024 * 1024
+}
 
 func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	repo := &fakeRepository{}
@@ -100,6 +107,7 @@ func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	return &indexer.Indexer{
 		Repository: repo,
 		Submitter:  submitter,
+		Encoder:    indexer.NewEncoder(repo.GetLimitFileSize()),
 	}, repo, submitter
 }
 
@@ -111,10 +119,10 @@ func readerFunc(data string, err error) func() (io.ReadCloser, error) {
 
 func gitFile(path, content string) *git.File {
 	return &git.File{
-		Path: path,
-		Blob: readerFunc(content, nil),
-		Size: int64(len(content)),
-		Oid:  oid,
+		Path:         path,
+		Blob:         readerFunc(content, nil),
+		SkipTooLarge: false,
+		Oid:          oid,
 	}
 }
 
@@ -153,8 +161,8 @@ func validCommit(gitCommit *git.Commit) *indexer.Commit {
 	return &indexer.Commit{
 		Type:      "commit",
 		ID:        indexer.GenerateCommitID(parentID, gitCommit.Hash),
-		Author:    indexer.BuildPerson(gitCommit.Author),
-		Committer: indexer.BuildPerson(gitCommit.Committer),
+		Author:    indexer.BuildPerson(gitCommit.Author, setupEncoder()),
+		Committer: indexer.BuildPerson(gitCommit.Committer, setupEncoder()),
 		RepoID:    parentIDString,
 		Message:   gitCommit.Message,
 		SHA:       sha,
@@ -186,7 +194,7 @@ func TestIndex(t *testing.T) {
 	gitRemoved := gitFile("foo/qux", "removed file")
 
 	gitTooBig := gitFile("invalid/too-big", "")
-	gitTooBig.Size = int64(1024*1024 + 1)
+	gitTooBig.SkipTooLarge = true
 
 	gitBinary := gitFile("invalid/binary", "foo\x00")
 
@@ -205,8 +213,8 @@ func TestIndex(t *testing.T) {
 
 	index(idx)
 
-	require.Equal(t, submit.indexed, 3)
-	require.Equal(t, submit.removed, 1)
+	require.Equal(t, 3, submit.indexed)
+	require.Equal(t, 1, submit.removed)
 
 	require.Equal(t, parentIDString+"_"+added.Path, submit.indexedID[0])
 	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": added, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[0])

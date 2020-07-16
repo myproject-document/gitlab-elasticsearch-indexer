@@ -65,6 +65,7 @@ func main() {
 	idx := &indexer.Indexer{
 		Submitter:  esClient,
 		Repository: repo,
+		Encoder:    indexer.NewEncoder(repo.GetLimitFileSize()),
 	}
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)

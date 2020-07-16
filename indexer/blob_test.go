@@ -13,7 +13,7 @@ func TestBuildBlob(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	expected := validBlob(file, "foo", "Text")
 
-	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob")
+	actual, err := indexer.BuildBlob(file, parentID, expected.CommitSHA, "blob", setupEncoder())
 	require.NoError(t, err)
 
 	require.Equal(t, expected, actual)
@@ -36,9 +36,9 @@ func TestBuildBlob(t *testing.T) {
 
 func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
-	file.Size = 1024*1024 + 1
+	file.SkipTooLarge = true
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
 	require.Error(t, err, indexer.SkipTooLargeBlob)
 	require.Nil(t, blob)
 }
@@ -46,14 +46,14 @@ func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
 func TestBuildBlobSkipsBinaryBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo\x00")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
 	require.Equal(t, err, indexer.SkipBinaryBlob)
 	require.Nil(t, blob)
 }
 
 func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 	file := gitFile("Makefile.am", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
 
 	require.NoError(t, err)
 	require.Equal(t, "Makefile", blob.Language)
@@ -61,7 +61,7 @@ func TestBuildBlobDetectsLanguageByFilename(t *testing.T) {
 
 func TestBuildBlobDetectsLanguageByExtension(t *testing.T) {
 	file := gitFile("foo.rb", "foo")
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob")
+	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
 
 	require.NoError(t, err)
 	require.Equal(t, "Ruby", blob.Language)

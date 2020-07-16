@@ -13,7 +13,7 @@ func TestBuildCommit(t *testing.T) {
 	gitCommit := gitCommit("Initial commit")
 
 	expected := validCommit(gitCommit)
-	actual := indexer.BuildCommit(gitCommit, parentID)
+	actual := indexer.BuildCommit(gitCommit, parentID, setupEncoder())
 
 	require.Equal(t, expected, actual)
 
