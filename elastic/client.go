@@ -141,9 +141,11 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 //
 // Order of resolution
 // 1.  Static Credentials - As configured in Indexer config
-// 2.  IAM Role Based Credentials
-//     2a.  ECS Role Credentials
-//     2b.  EC2 Instance Role Credentials
+// 2.  Credentials from other providers
+//     2a.  Credentials via env variables
+//     2b.  Credentials via config files
+//     2c.  ECS Role Credentials
+//     2d.  EC2 Instance Role Credentials
 func ResolveAWSCredentials(config *Config, awsConfig *aws.Config) *credentials.Credentials {
 	providers := []credentials.Provider{
 		&credentials.StaticProvider{
@@ -152,8 +154,8 @@ func ResolveAWSCredentials(config *Config, awsConfig *aws.Config) *credentials.C
 				SecretAccessKey: config.SecretKey,
 			},
 		},
-		defaults.RemoteCredProvider(*awsConfig, defaults.Handlers()),
 	}
+	providers = append(providers, defaults.CredProviders(awsConfig, defaults.Handlers())...)
 	return credentials.NewChainCredentials(providers)
 }
 
