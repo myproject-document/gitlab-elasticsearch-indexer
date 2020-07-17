@@ -82,9 +82,37 @@ func TestResolveAWSCredentialsStatic(t *testing.T) {
 	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
 	require.NoError(err)
-	require.Nil(err, "Expect no error, %v", err)
 	require.Equal("static_access_key", credsValue.AccessKeyID, "Expect access key ID to match")
 	require.Equal("static_secret_access_key", credsValue.SecretAccessKey, "Expect secret access key to match")
+}
+
+func TestResolveAWSEnvCredentials(t *testing.T) {
+	require := require.New(t)
+
+	awsConfig := &aws.Config{}
+	config, err := elastic.ReadConfig(strings.NewReader(
+		`{
+			"url":["http://localhost:9200"],
+			"aws":true
+		}`,
+	))
+	require.NoError(err)
+
+	os.Setenv("AWS_ACCESS_KEY_ID", "id")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "secret")
+	os.Setenv("AWS_SESSION_TOKEN", "session-token")
+	defer func() {
+		os.Unsetenv("AWS_ACCESS_KEY_ID")
+		os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+		os.Unsetenv("AWS_SESSION_TOKEN")
+	}()
+
+	creds := elastic.ResolveAWSCredentials(config, awsConfig)
+	credsValue, err := creds.Get()
+	require.NoError(err)
+	require.Equal("id", credsValue.AccessKeyID, "Expect access key ID to match")
+	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
+	require.Equal("session-token", credsValue.SessionToken, "Expect session token to match")
 }
 
 func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
@@ -106,10 +134,13 @@ func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
 		}`,
 	))
 
+	// Bypass shared aws credential config file
+	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
+	defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE")
+
 	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
 	require.NoError(err)
-	require.Nil(err, "Expect no error, %v", err)
 	require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
 	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
 }
@@ -133,13 +164,17 @@ func TestResolveAWSCredentialsECSCredsProvider(t *testing.T) {
 		}`,
 	))
 
+	// Bypass shared aws credential config file
+	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
 	os.Setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", server.URL+"/latest/meta-data/iam/security-credentials/RoleName")
-	defer os.Unsetenv("AWS_CONTAINER_CREDENTIALS_FULL_URI")
+	defer func() {
+		defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE")
+		defer os.Unsetenv("AWS_CONTAINER_CREDENTIALS_FULL_URI")
+	}()
 
 	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
 	require.NoError(err)
-	require.Nil(err, "Expect no error, %v", err)
 	require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
 	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
 }
