@@ -62,11 +62,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	idx := &indexer.Indexer{
-		Submitter:  esClient,
-		Repository: repo,
-		Encoder:    indexer.NewEncoder(repo.GetLimitFileSize()),
-	}
+	idx := indexer.NewIndexer(repo, esClient)
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
 	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", esClient.IndexName, esClient.ParentID(), blobType, skipCommits)

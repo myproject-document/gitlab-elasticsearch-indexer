@@ -104,11 +104,7 @@ func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	repo := &fakeRepository{}
 	submitter := &fakeSubmitter{}
 
-	return &indexer.Indexer{
-		Repository: repo,
-		Submitter:  submitter,
-		Encoder:    indexer.NewEncoder(repo.GetLimitFileSize()),
-	}, repo, submitter
+	return indexer.NewIndexer(repo, submitter), repo, submitter
 }
 
 func readerFunc(data string, err error) func() (io.ReadCloser, error) {

@@ -22,6 +22,14 @@ type Indexer struct {
 	Encoder *Encoder
 }
 
+func NewIndexer(repository git.Repository, submitter Submitter) *Indexer {
+	return &Indexer{
+		Repository: repository,
+		Submitter:  submitter,
+		Encoder:    NewEncoder(repository.GetLimitFileSize()),
+	}
+}
+
 func (i *Indexer) submitCommit(c *git.Commit) error {
 	commit := BuildCommit(c, i.Submitter.ParentID(), i.Encoder)
 
