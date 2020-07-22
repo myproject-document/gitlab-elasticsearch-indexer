@@ -4,26 +4,29 @@ import (
 	"fmt"
 	"log"
 
-	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
-
 	"gitlab.com/lupine/icu"
 )
 
-var (
+type Encoder struct {
 	detector  *icu.CharsetDetector
-	converter = icu.NewCharsetConverter(git.LimitFileSize)
-)
+	converter *icu.CharsetConverter
+}
 
-func init() {
-	var err error
-	detector, err = icu.NewCharsetDetector()
+func NewEncoder(limitFileSize int64) *Encoder {
+	encoder := &Encoder{}
+	detector, err := icu.NewCharsetDetector()
 	if err != nil {
 		panic(err)
 	}
+
+	encoder.detector = detector
+	encoder.converter = icu.NewCharsetConverter(int(limitFileSize))
+
+	return encoder
 }
 
-func tryEncodeString(s string) string {
-	encoded, err := encodeString(s)
+func (e *Encoder) tryEncodeString(s string) string {
+	encoded, err := e.encodeString(s)
 	if err != nil {
 		log.Println(err)
 		return s // TODO: Run it through the UTF-8 replacement encoder
@@ -32,8 +35,8 @@ func tryEncodeString(s string) string {
 	return encoded
 }
 
-func tryEncodeBytes(b []byte) string {
-	encoded, err := encodeBytes(b)
+func (e *Encoder) tryEncodeBytes(b []byte) string {
+	encoded, err := e.encodeBytes(b)
 	if err != nil {
 		log.Println(err)
 		s := string(b)
@@ -43,24 +46,24 @@ func tryEncodeBytes(b []byte) string {
 	return encoded
 }
 
-func encodeString(s string) (string, error) {
-	return encodeBytes([]byte(s))
+func (e *Encoder) encodeString(s string) (string, error) {
+	return e.encodeBytes([]byte(s))
 }
 
 // encodeString converts a string from an arbitrary encoding to UTF-8
-func encodeBytes(b []byte) (string, error) {
+func (e *Encoder) encodeBytes(b []byte) (string, error) {
 	if len(b) == 0 {
 		return "", nil
 	}
 
-	matches, err := detector.GuessCharset(b)
+	matches, err := e.detector.GuessCharset(b)
 	if err != nil {
 		return "", fmt.Errorf("Couldn't guess charset: %s", err)
 	}
 
 	// Try encoding for each match, returning the first that succeeds
 	for _, match := range matches {
-		utf8, err := converter.ConvertToUtf8(b, match.Charset)
+		utf8, err := e.converter.ConvertToUtf8(b, match.Charset)
 		if err == nil {
 			return string(utf8), nil
 		}

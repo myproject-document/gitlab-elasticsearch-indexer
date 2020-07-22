@@ -19,10 +19,19 @@ type Submitter interface {
 type Indexer struct {
 	git.Repository
 	Submitter
+	Encoder *Encoder
+}
+
+func NewIndexer(repository git.Repository, submitter Submitter) *Indexer {
+	return &Indexer{
+		Repository: repository,
+		Submitter:  submitter,
+		Encoder:    NewEncoder(repository.GetLimitFileSize()),
+	}
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
-	commit := BuildCommit(c, i.Submitter.ParentID())
+	commit := BuildCommit(c, i.Submitter.ParentID(), i.Encoder)
 
 	joinData := map[string]string{
 		"name":   "commit",
@@ -33,7 +42,7 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 }
 
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
-	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob")
+	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob", i.Encoder)
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil
@@ -51,7 +60,7 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 }
 
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
-	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob")
+	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob", i.Encoder)
 	if err != nil {
 		if isSkipBlobErr(err) {
 			return nil

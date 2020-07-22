@@ -20,10 +20,10 @@ func GenerateDate(t time.Time) string {
 	return t.Format(elasticTimeFormat)
 }
 
-func BuildPerson(p git.Signature) *Person {
+func BuildPerson(p git.Signature, encoder *Encoder) *Person {
 	return &Person{
-		Name:  tryEncodeString(p.Name),
-		Email: tryEncodeString(p.Email),
+		Name:  encoder.tryEncodeString(p.Name),
+		Email: encoder.tryEncodeString(p.Email),
 		Time:  GenerateDate(p.When),
 	}
 }

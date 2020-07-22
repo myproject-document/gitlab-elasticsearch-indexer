@@ -59,8 +59,8 @@ func GenerateBlobID(parentID int64, filename string) string {
 	return fmt.Sprintf("%v_%s", parentID, filename)
 }
 
-func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string) (*Blob, error) {
-	if file.Size > git.LimitFileSize {
+func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string, encoder *Encoder) (*Blob, error) {
+	if file.SkipTooLarge {
 		return nil, SkipTooLargeBlob
 	}
 
@@ -82,8 +82,8 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		return nil, SkipBinaryBlob
 	}
 
-	content := tryEncodeBytes(b)
-	filename := tryEncodeString(file.Path)
+	content := encoder.tryEncodeBytes(b)
+	filename := encoder.tryEncodeString(file.Path)
 	blob := &Blob{
 		ID:        GenerateBlobID(parentID, filename),
 		OID:       file.Oid,

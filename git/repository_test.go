@@ -116,6 +116,16 @@ func setupTestRepository(t *testing.T, fromSha, toSha string) git.Repository {
 	return repo
 }
 
+func setupTestRepositoryWithConfig(t *testing.T, fromSha, toSha string, config *git.StorageConfig) git.Repository {
+	checkDeps(t)
+	require.NoError(t, ensureGitalyRepository(t))
+
+	repo, err := git.NewGitalyClient(config, fromSha, toSha, "the-correlation-id")
+	require.NoError(t, err)
+
+	return repo
+}
+
 func TestEachCommit(t *testing.T) {
 	repo := setupTestRepository(t, "", headSHA)
 
@@ -307,7 +317,6 @@ func TestEachFileChangeAllModifications(t *testing.T) {
 
 	require.Equal(t, "VERSION", file.Path)
 	require.Equal(t, "998707b421c89bd9a3063333f9f728ef3e43d101", file.Oid)
-	require.Equal(t, int64(10), file.Size)
 	require.Equal(t, "6.7.0.pre\n", string(data))
 }
 
@@ -337,4 +346,28 @@ func TestEachFileChangeWithRename(t *testing.T) {
 
 	require.Contains(t, putFiles, "files/js/commit.coffee")
 	require.Contains(t, delFiles, "files/js/commit.js.coffee")
+}
+
+func TestEachFileSkipsFilesLargerThanLimitFileSize(t *testing.T) {
+	checkDeps(t)
+	require.NoError(t, ensureGitalyRepository(t))
+
+	// Update the limit in the config to 20k to ensure CHANGELOG is skipped
+	config, err := git.ReadConfig(testRepo)
+	require.NoError(t, err)
+	config.LimitFileSize = 20 * 1024
+
+	// Run indexing with the new limit set
+	repo := setupTestRepositoryWithConfig(t, "19e2e9b4ef76b422ce1154af39a91323ccc57434", "c347ca2e140aa667b968e51ed0ffe055501fe4f4", config)
+	putFiles, _, _, err := runEachFileChange(repo)
+	require.NoError(t, err)
+
+	// CHANGELOG is larger than 20k limit so it should have 0 bytes
+	file := putFiles["CHANGELOG"]
+	require.Equal(t, true, file.SkipTooLarge)
+	blob, err := file.Blob()
+	require.NoError(t, err)
+	data, err := ioutil.ReadAll(blob)
+	require.NoError(t, err)
+	require.Equal(t, 0, len(data))
 }

@@ -25,20 +25,21 @@ import (
 
 const (
 	SubmoduleFileMode = 0160000
-	LimitFileSize     = 1024 * 1024
 	// See https://stackoverflow.com/questions/9765453/is-gits-semi-secret-empty-tree-object-reliable-and-why-is-there-not-a-symbolic
 	NullTreeSHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 	ZeroSHA     = "0000000000000000000000000000000000000000"
 
-	clientName = "gitlab-elasticsearch-indexer"
+	clientName                 = "gitlab-elasticsearch-indexer"
+	defaultLimitFileSize int64 = 1024 * 1024
 )
 
 type StorageConfig struct {
-	Address      string `json:"address"`
-	Token        string `json:"token"`
-	StorageName  string `json:"storage"`
-	RelativePath string `json:"relative_path"`
-	TokenVersion int    `json:"token_version"`
+	Address       string `json:"address"`
+	Token         string `json:"token"`
+	StorageName   string `json:"storage"`
+	RelativePath  string `json:"relative_path"`
+	LimitFileSize int64  `json:"limit_file_size"`
+	TokenVersion  int    `json:"token_version"`
 }
 
 type gitalyClient struct {
@@ -51,6 +52,7 @@ type gitalyClient struct {
 	ctx                     context.Context
 	FromHash                string
 	ToHash                  string
+	limitFileSize           int64
 }
 
 func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
@@ -96,6 +98,7 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string
 		refServiceClient:        pb.NewRefServiceClient(conn),
 		commitServiceClient:     pb.NewCommitServiceClient(conn),
 		ctx:                     ctx,
+		limitFileSize:           config.LimitFileSize,
 	}
 
 	if fromSHA == "" || fromSHA == ZeroSHA {
@@ -117,16 +120,24 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string
 	return client, nil
 }
 
-func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
+func ReadConfig(projectPath string) (*StorageConfig, error) {
 	data := strings.NewReader(os.Getenv("GITALY_CONNECTION_INFO"))
 
-	config := StorageConfig{RelativePath: projectPath}
+	config := StorageConfig{RelativePath: projectPath, LimitFileSize: defaultLimitFileSize}
 
-	if err := json.NewDecoder(data).Decode(&config); err != nil {
+	err := json.NewDecoder(data).Decode(&config)
+
+	return &config, err
+}
+
+func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
+	config, err := ReadConfig(projectPath)
+
+	if err != nil {
 		return nil, err
 	}
 
-	client, err := NewGitalyClient(&config, fromSHA, toSHA, correlationID)
+	client, err := NewGitalyClient(config, fromSHA, toSHA, correlationID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s: %s", config.RelativePath, err)
 	}
@@ -229,7 +240,7 @@ func (gc *gitalyClient) getBlob(oid string) (io.ReadCloser, error) {
 	request := &pb.GetBlobRequest{
 		Repository: gc.repository,
 		Oid:        oid,
-		Limit:      LimitFileSize,
+		Limit:      gc.limitFileSize,
 	}
 
 	stream, err := gc.blobServiceClient.GetBlob(gc.ctx, request)
@@ -255,11 +266,13 @@ func (gc *gitalyClient) getBlob(oid string) (io.ReadCloser, error) {
 
 func (gc *gitalyClient) gitalyBuildFile(change *pb.GetRawChangesResponse_RawChange, path string) (*File, error) {
 	var data io.ReadCloser
+	var skipTooLarge bool
 	// We limit the size to avoid loading too big blobs into memory
 	// as they will be rejected on the indexer side anyway
 	// Ideally, we need to create a lazy blob reader here.
-	if change.Size > LimitFileSize {
+	if change.Size > gc.limitFileSize {
 		data = ioutil.NopCloser(new(bytes.Buffer))
+		skipTooLarge = true
 	} else {
 		var err error
 		data, err = gc.getBlob(change.BlobId)
@@ -269,10 +282,10 @@ func (gc *gitalyClient) gitalyBuildFile(change *pb.GetRawChangesResponse_RawChan
 	}
 
 	return &File{
-		Path: path,
-		Oid:  change.BlobId,
-		Blob: getBlobReader(data),
-		Size: change.Size,
+		Path:         path,
+		Oid:          change.BlobId,
+		Blob:         getBlobReader(data),
+		SkipTooLarge: skipTooLarge,
 	}, nil
 }
 
@@ -316,6 +329,10 @@ func (gc *gitalyClient) EachCommit(f CommitFunc) error {
 		}
 	}
 	return nil
+}
+
+func (gc *gitalyClient) GetLimitFileSize() int64 {
+	return gc.limitFileSize
 }
 
 func gitalyBuildSignature(ca *pb.CommitAuthor) Signature {

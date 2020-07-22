@@ -6,10 +6,10 @@ import (
 )
 
 type File struct {
-	Path string
-	Blob func() (io.ReadCloser, error)
-	Oid  string
-	Size int64
+	Path         string
+	Blob         func() (io.ReadCloser, error)
+	Oid          string
+	SkipTooLarge bool
 }
 
 type Signature struct {
@@ -28,6 +28,7 @@ type Commit struct {
 type Repository interface {
 	EachFileChange(put PutFunc, del DelFunc) error
 	EachCommit(f CommitFunc) error
+	GetLimitFileSize() int64
 }
 
 type PutFunc func(file *File, fromCommit, toCommit string) error
