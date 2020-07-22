@@ -1,5 +1,10 @@
 # GitLab Elasticsearch Indexer
 
+## v2.5.0
+
+- Support configurable file size limit via Gitaly env config !84
+- Support taking AWS credentials via environment variables !82
+
 ## v2.4.0
 
 - Send correlation ID to Elasticsearch as X-Opaque-Id !78
