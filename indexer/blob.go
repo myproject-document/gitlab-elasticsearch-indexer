@@ -2,6 +2,7 @@ package indexer
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -55,8 +56,22 @@ type Blob struct {
 	Language string `json:"language"`
 }
 
-func GenerateBlobID(parentID int64, filename string) string {
-	return fmt.Sprintf("%v_%s", parentID, filename)
+// Avoid Ids that exceed the Elasticsearch limit of 512 characters
+// the path will be hashed if the BlobID length is over 512
+// This allows will support existing blobs in the index without the need
+// to regenerate the id for each
+func GenerateBlobID(parentID int64, path string) string {
+	blobID := fmt.Sprintf("%v_%s", parentID, path)
+	if len(blobID) > 512 {
+		return HashStr(blobID)
+	}
+	return blobID
+}
+
+func HashStr(s string) string {
+	bytes := []byte(s)
+
+	return fmt.Sprintf("%x", sha1.Sum(bytes))
 }
 
 func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string, encoder *Encoder) (*Blob, error) {
