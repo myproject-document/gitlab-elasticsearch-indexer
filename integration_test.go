@@ -188,6 +188,22 @@ func TestIndexingRemovesFiles(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIndexingFilesWithLongPath(t *testing.T) {
+	checkDeps(t)
+	ensureGitalyRepository(t)
+	c, td := buildWorkingIndex(t)
+
+	defer td()
+
+	// commit where a filename with a very long path is introduced
+	err, _, _ := run("", "e2c7507b72f55cc272bbd5fde5bfa46eb4aeeebf")
+	require.NoError(t, err)
+
+	// hashed filename from the commit above
+	_, err = c.GetBlob("e600da5384d3a616836c47fb8df1a84ce7752bd3")
+	require.NoError(t, err)
+}
+
 type document struct {
 	Blob      *indexer.Blob     `json:"blob"`
 	Commit    *indexer.Commit   `json:"commit"`
