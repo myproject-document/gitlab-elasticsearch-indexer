@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.6.0
+
+- Support file paths longer than Elasticsearch 512 byte id limit !87
+
 ## v2.5.0
 
 - Support configurable file size limit via Gitaly env config !84
