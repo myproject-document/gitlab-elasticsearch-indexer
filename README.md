@@ -111,6 +111,10 @@ make test
 go test -v gitlab.com/gitlab-org/gitlab-elasticsearch-indexer -run TestIndexingGitlabTest
 ```
 
+### Testing in gdk
+
+You can test changes to the indexer in your GDK by modifying [GITLAB_ELASTICSEARCH_INDEXER_VERSION](https://gitlab.com/gitlab-org/gitlab/-/blob/master/GITLAB_ELASTICSEARCH_INDEXER_VERSION) to point to the branch name containing the changes.
+
 ## Contributing
 
 Please see the [contribution guidelines](CONTRIBUTING.md)
