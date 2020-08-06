@@ -6,7 +6,9 @@ import (
 	"strings"
 )
 
-const IndexMapping = `
+// indexMapping is used as an example for testing purposes only and is 
+// not intended to be kept synchronized with GitLab
+const indexMapping = `
 {
 	"settings": {
 		"analysis": {
@@ -18,15 +20,7 @@ const IndexMapping = `
 				"code": {
 					"type": "pattern_capture",
 					"preserve_original": "true",
-					"patterns": [
-						"(\\p{Ll}+|\\p{Lu}\\p{Ll}+|\\p{Lu}+)",
-						"(\\d+)",
-						"(?=([\\p{Lu}]+[\\p{L}]+))",
-						"\"((?:\\\"|[^\"]|\\\")*)\"",
-						"'((?:\\'|[^']|\\')*)'",
-						"\\.([^.]+)(?=\\.|\\s|\\Z)",
-						"\\/?([^\\/]+)(?=\\/|\\b)"
-					]
+					"patterns": "(\\w+)"
 				},
 				"edgeNGram_filter": {
 					"type": "edgeNGram",
@@ -111,7 +105,7 @@ const IndexMapping = `
 	}
 }`
 
-const IndexProperties = `
+const indexProperties = `
 {
 	"archived": {
 		"type": "boolean"
@@ -403,14 +397,14 @@ func (c *Client) createIndex(mapping string) error {
 
 // CreateIndex creates an index matching that created by gitlab-rails.
 func (c *Client) CreateWorkingIndex() error {
-	mapping := strings.Replace(IndexMapping, "__PROPERTIES__", IndexProperties, -1)
-
+	mapping := strings.Replace(indexMapping, "__PROPERTIES__", indexProperties, -1)
+		
 	return c.createIndex(mapping)
 }
 
 // For testing
 func (c *Client) CreateBrokenIndex() error {
-	mapping := strings.Replace(IndexMapping, "__PROPERTIES__", "{}", -1)
+	mapping := strings.Replace(indexMapping, "__PROPERTIES__", "{}", -1)
 
 	return c.createIndex(mapping)
 }
