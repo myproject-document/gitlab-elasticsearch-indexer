@@ -36,7 +36,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-comits] <project-id> <project-path> ]", os.Args[0])
+		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] <project-id> <project-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
