@@ -58,6 +58,11 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 			} else {
 				fmt.Fprintf(w, credsRespTmpl, expireOn)
 			}
+		case "/": // HEAD request, health check
+			fmt.Fprintf(w, "")
+		case "/gitlab-index-test/doc/667":
+			time.Sleep(3 * time.Second)
+			fmt.Fprintln(w, "{}")
 		default:
 			http.Error(w, "bad request", http.StatusBadRequest)
 		}
@@ -348,4 +353,45 @@ func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
 
 	require.NotNil(t, req)
 	require.Equal(t, "the-correlation-id", req.Header.Get("X-Opaque-Id"))
+}
+
+func TestClientTimeout(t *testing.T) {
+	require := require.New(t)
+
+	server := initTestServer("2014-12-16T01:51:37Z", false)
+	defer server.Close()
+
+	config := os.Getenv("ELASTIC_CONNECTION_INFO")
+	os.Setenv(
+		"ELASTIC_CONNECTION_INFO",
+		`{
+			"url": ["`+server.URL+`"],
+			"index_name": "gitlab-index-test",
+			"client_request_timeout": 1
+		}`,
+	)
+	defer os.Setenv("ELASTIC_CONNECTION_INFO", config)
+
+	client := setupTestClient(t)
+	require.NotNil(client)
+
+	_, err := client.Get(projectIDString)
+	require.Error(
+		err,
+		"context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+	)
+
+	os.Setenv(
+		"ELASTIC_CONNECTION_INFO",
+		`{
+			"url": ["`+server.URL+`"],
+			"index_name": "gitlab-index-test"
+		}`,
+	)
+
+	client = setupTestClient(t)
+	require.NotNil(client)
+
+	_, err = client.Get(projectIDString)
+	require.NoError(err)
 }
