@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -80,6 +81,10 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 func NewClient(config *Config, correlationID string) (*Client, error) {
 	var opts []elastic.ClientOptionFunc
 
+	httpClient := &http.Client{}
+	if config.RequestTimeout != 0 {
+		httpClient.Timeout = time.Duration(config.RequestTimeout) * time.Second
+	}
 	// AWS settings have to come first or they override custom URL, etc
 	if config.AWS {
 		awsConfig := &aws.Config{
@@ -88,12 +93,16 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 		}
 		credentials := ResolveAWSCredentials(config, awsConfig)
 		signer := v4.NewSigner(credentials)
-		awsClient, err := aws_signing_client.New(signer, &http.Client{}, "es", config.Region)
+		awsClient, err := aws_signing_client.New(signer, httpClient, "es", config.Region)
 		if err != nil {
 			return nil, err
 		}
 
 		opts = append(opts, elastic.SetHttpClient(awsClient))
+	} else {
+		if config.RequestTimeout != 0 {
+			opts = append(opts, elastic.SetHttpClient(httpClient))
+		}
 	}
 
 	// Sniffer should look for HTTPS URLs if at-least-one initial URL is HTTPS
