@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.7.0
+
+- Make Elasticsearch HTTP Client timeout configurable via ENV variable !91
+
 ## v2.6.0
 
 - Support file paths longer than Elasticsearch 512 byte id limit !87
