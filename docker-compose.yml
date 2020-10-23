@@ -8,6 +8,8 @@ services:
       - '8075:8075'
 
   elasticsearch:
+    environment:
+      - discovery.type=single-node
     image: elasticsearch:7.9.2
     ports:
       - '9201:9200'
