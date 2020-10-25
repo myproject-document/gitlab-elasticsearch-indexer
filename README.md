@@ -44,7 +44,7 @@ PREFIX=/usr sudo -E make install
 Test suite expects Gitaly and Elasticsearch to be run, on the following ports:
 
   - Gitaly: 8075
-  - ElasticSearch v6.8.6: 9201
+  - ElasticSearch v7.9.2: 9201
 
 ### Quick tests
 
@@ -71,7 +71,7 @@ If you want to test a particular setup, for instance:
 
   - You want to run on a local Gitaly instance, as the one from the GDK
   - You want to use a specific ElasticSearch cluster, as the one from the GDK
-  
+
 Then you'll have to manually set the proper tests connections.
 
 First, start the services that you need (`gitlab`, `elasticsearch`), with using `docker-compose up <service> -d`

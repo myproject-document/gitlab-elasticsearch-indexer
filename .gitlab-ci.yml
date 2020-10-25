@@ -61,7 +61,7 @@ include:
 .test-es7:
   extends: .test-default
   services:
-    - name: elasticsearch:7.5.1
+    - name: elasticsearch:7.9.2
       command: ["elasticsearch", "-E", "discovery.type=single-node"]
       alias: elasticsearch
     - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
