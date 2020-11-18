@@ -16,6 +16,7 @@ var (
 	versionFlag     = flag.Bool("version", false, "Print the version and exit")
 	skipCommitsFlag = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
 	blobTypeFlag    = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
+	projectPathFlag = flag.String("project-path", "", "Project path")
 
 	// Overriden in the makefile
 	Version   = "dev"
@@ -36,23 +37,24 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] <project-id> <project-path> ]", os.Args[0])
+		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] <project-id> <repo-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	projectPath := args[1]
+	repoPath := args[1]
+
 	fromSHA := os.Getenv("FROM_SHA")
 	toSHA := os.Getenv("TO_SHA")
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
+	projectPath := *projectPathFlag
 	correlationID := generateCorrelationID()
 
-	repo, err := git.NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID)
+	repo, err := git.NewGitalyClientFromEnv(repoPath, fromSHA, toSHA, correlationID, args[0], projectPath)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -47,7 +47,7 @@ func TestNewGitalyClientWithContextID(t *testing.T) {
 
 	testConfig := getConfig(listener.Addr().String())
 
-	client, err := NewGitalyClient(testConfig, testFromCommitSHA, testToCommitSHA, "the-correlation-id")
+	client, err := NewGitalyClient(testConfig, testFromCommitSHA, testToCommitSHA, "the-correlation-id", "some-random-id")
 	r.NoError(err)
 	r.NotNil(client)
 

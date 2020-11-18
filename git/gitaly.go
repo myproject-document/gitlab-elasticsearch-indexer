@@ -38,6 +38,7 @@ type StorageConfig struct {
 	Token         string `json:"token"`
 	StorageName   string `json:"storage"`
 	RelativePath  string `json:"relative_path"`
+	ProjectPath   string `json:"project_path"`
 	LimitFileSize int64  `json:"limit_file_size"`
 	TokenVersion  int    `json:"token_version"`
 }
@@ -55,7 +56,7 @@ type gitalyClient struct {
 	limitFileSize           int64
 }
 
-func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
+func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID, projectID string) (*gitalyClient, error) {
 	var RPCCred credentials.PerRPCCredentials
 	if config.TokenVersion == 0 || config.TokenVersion == 2 {
 		RPCCred = gitalyauth.RPCCredentialsV2(config.Token)
@@ -86,8 +87,10 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string
 	}
 
 	repository := &pb.Repository{
-		StorageName:  config.StorageName,
-		RelativePath: config.RelativePath,
+		StorageName:   config.StorageName,
+		RelativePath:  config.RelativePath,
+		GlProjectPath: config.ProjectPath,
+		GlRepository:  projectID,
 	}
 
 	client := &gitalyClient{
@@ -120,24 +123,28 @@ func NewGitalyClient(config *StorageConfig, fromSHA, toSHA, correlationID string
 	return client, nil
 }
 
-func ReadConfig(projectPath string) (*StorageConfig, error) {
+func ReadConfig(repoPath, projectPath string) (*StorageConfig, error) {
 	data := strings.NewReader(os.Getenv("GITALY_CONNECTION_INFO"))
 
-	config := StorageConfig{RelativePath: projectPath, LimitFileSize: defaultLimitFileSize}
+	config := StorageConfig{
+		RelativePath:  repoPath,
+		ProjectPath:   projectPath,
+		LimitFileSize: defaultLimitFileSize,
+	}
 
 	err := json.NewDecoder(data).Decode(&config)
 
 	return &config, err
 }
 
-func NewGitalyClientFromEnv(projectPath, fromSHA, toSHA, correlationID string) (*gitalyClient, error) {
-	config, err := ReadConfig(projectPath)
+func NewGitalyClientFromEnv(repoPath, fromSHA, toSHA, correlationID, projectID, projectPath string) (*gitalyClient, error) {
+	config, err := ReadConfig(repoPath, projectPath)
 
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := NewGitalyClient(config, fromSHA, toSHA, correlationID)
+	client, err := NewGitalyClient(config, fromSHA, toSHA, correlationID, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to open %s: %s", config.RelativePath, err)
 	}

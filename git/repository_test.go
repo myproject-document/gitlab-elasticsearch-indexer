@@ -26,6 +26,7 @@ const (
 	headSHA           = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
 	initialSHA        = "1a0b36b3cdad1d2ee32457c102a8c0b7056fa863"
 	testRepo          = "gitlab-org/gitlab-test.git"
+	testProjectPath   = "gitlab-org/gitlab-test"
 	testRepoPath      = "https://gitlab.com/gitlab-org/gitlab-test.git"
 	testRepoNamespace = "gitlab-org"
 )
@@ -63,8 +64,9 @@ func ensureGitalyRepository(t *testing.T) error {
 	}
 
 	gl_repository := &pb.Repository{
-		StorageName:  gitalyConnInfo.Storage,
-		RelativePath: testRepo,
+		StorageName:   gitalyConnInfo.Storage,
+		RelativePath:  testRepo,
+		GlProjectPath: testProjectPath,
 	}
 
 	createReq := &pb.CreateRepositoryFromURLRequest{
@@ -110,7 +112,7 @@ func setupTestRepository(t *testing.T, fromSha, toSha string) git.Repository {
 	checkDeps(t)
 	require.NoError(t, ensureGitalyRepository(t))
 
-	repo, err := git.NewGitalyClientFromEnv(testRepo, fromSha, toSha, "the-correlation-id")
+	repo, err := git.NewGitalyClientFromEnv(testRepo, fromSha, toSha, "the-correlation-id", projectID, testProjectPath)
 	require.NoError(t, err)
 
 	return repo
@@ -120,7 +122,7 @@ func setupTestRepositoryWithConfig(t *testing.T, fromSha, toSha string, config *
 	checkDeps(t)
 	require.NoError(t, ensureGitalyRepository(t))
 
-	repo, err := git.NewGitalyClient(config, fromSha, toSha, "the-correlation-id")
+	repo, err := git.NewGitalyClient(config, fromSha, toSha, "the-correlation-id", projectID)
 	require.NoError(t, err)
 
 	return repo
@@ -353,7 +355,7 @@ func TestEachFileSkipsFilesLargerThanLimitFileSize(t *testing.T) {
 	require.NoError(t, ensureGitalyRepository(t))
 
 	// Update the limit in the config to 20k to ensure CHANGELOG is skipped
-	config, err := git.ReadConfig(testRepo)
+	config, err := git.ReadConfig(testRepo, testProjectPath)
 	require.NoError(t, err)
 	config.LimitFileSize = 20 * 1024
 
