@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.8.0
+
+- Set glProjectPath and glRepository on Gitaly calls !94
+
 ## v2.7.0
 
 - Make Elasticsearch HTTP Client timeout configurable via ENV variable !91
