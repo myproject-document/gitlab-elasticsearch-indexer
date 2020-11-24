@@ -1,5 +1,7 @@
 module gitlab.com/gitlab-org/gitlab-elasticsearch-indexer
 
+go 1.15
+
 require (
 	github.com/aws/aws-sdk-go v1.19.6
 	github.com/deoxxa/aws_signing_client v0.0.0-20161109131055-c20ee106809e
@@ -16,5 +18,3 @@ require (
 	golang.org/x/tools v0.0.0-20200207001614-6fdc5776f4bb
 	google.golang.org/grpc v1.24.0
 )
-
-go 1.12
