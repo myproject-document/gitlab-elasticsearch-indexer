@@ -18,7 +18,7 @@ be performed by a maintainer.
 
 New versions can be released by one of the maintainers. The release process is:
 
--   pick a release branch. For x.y.0, use `master`. For all other
+-   pick a release branch. For x.y.0, use `main`. For all other
     versions (x.y.1, x.y.2 etc.) , use `x-y-stable`. Also see [below](#versioning)
 -   create a merge request to update CHANGELOG and VERSION on the
     release branch
@@ -35,14 +35,14 @@ branches.
 
 A version has the format MAJOR.MINOR.PATCH.
 
-- Major and minor releases are tagged on the `master` branch
+- Major and minor releases are tagged on the `main` branch
 - If the change is backwards compatible, increment the MINOR counter
 - If the change breaks compatibility, increment MAJOR and set MINOR to `0`
 - Patch release tags must be made on stable branches
 - Only make a patch release when targeting a GitLab stable branch
 
 This means that tags that end in `.0` (e.g. `8.5.0`) must always be on
-the master branch, and tags that end in anything other than `.0` (e.g.
+the main branch, and tags that end in anything other than `.0` (e.g.
 `8.5.2`) must always be on a stable branch.
 
 > The reason we do this is that SemVer suggests something like a
