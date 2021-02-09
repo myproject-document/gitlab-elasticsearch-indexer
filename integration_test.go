@@ -328,9 +328,12 @@ func TestIndexingGitlabTest(t *testing.T) {
 		blobDoc,
 	)
 
-	// Check that a binary blob isn't indexed
-	_, err = c.GetBlob("Gemfile.zip")
-	require.Error(t, err)
+	// Check that a binary blob is indexed
+	blob, err = c.GetBlob("Gemfile.zip")
+	require.NoError(t, err)
+	require.True(t, blob.Found)
+	require.Equal(t, projectIDString+"_Gemfile.zip", blob.Id)
+	require.Equal(t, "project_"+projectIDString, blob.Routing)
 
 	// Test that timezones are preserved
 	commit, err = c.GetCommit("498214de67004b1da3d820901307bed2a68a8ef6")
