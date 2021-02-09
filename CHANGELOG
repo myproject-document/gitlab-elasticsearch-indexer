@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.9.0
+
+- Only index file name in case of binary file type !99
+
 ## v2.8.0
 
 - Set glProjectPath and glRepository on Gitaly calls !94
