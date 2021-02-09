@@ -3,6 +3,7 @@ package indexer
 import (
 	"bytes"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -14,7 +15,8 @@ import (
 
 var (
 	SkipTooLargeBlob = fmt.Errorf("Blob should be skipped: Too large")
-	SkipBinaryBlob   = fmt.Errorf("Blob should be skipped: binary")
+
+	NoCodeContentMsgHolder = ""
 )
 
 const (
@@ -22,10 +24,7 @@ const (
 )
 
 func isSkipBlobErr(err error) bool {
-	switch err {
-	case SkipTooLargeBlob:
-		return true
-	case SkipBinaryBlob:
+	if errors.Is(err, SkipTooLargeBlob) {
 		return true
 	}
 
@@ -93,11 +92,11 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		return nil, err
 	}
 
-	if DetectBinary(b) {
-		return nil, SkipBinaryBlob
+	content := NoCodeContentMsgHolder
+	if !DetectBinary(b) {
+		content = encoder.tryEncodeBytes(b)
 	}
 
-	content := encoder.tryEncodeBytes(b)
 	filename := encoder.tryEncodeString(file.Path)
 	blob := &Blob{
 		ID:        GenerateBlobID(parentID, filename),

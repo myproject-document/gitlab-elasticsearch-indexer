@@ -192,10 +192,11 @@ func TestIndex(t *testing.T) {
 	gitTooBig := gitFile("invalid/too-big", "")
 	gitTooBig.SkipTooLarge = true
 
-	gitBinary := gitFile("invalid/binary", "foo\x00")
+	gitBinary := gitFile("nodisplay/binary.ninja", "foo\x00")
 
 	commit := validCommit(gitCommit)
 	added := validBlob(gitAdded, "added file", "Text")
+	binary := validBlob(gitBinary, indexer.NoCodeContentMsgHolder, "Ninja")
 	modified := validBlob(gitModified, "modified file", "Text")
 	removed := validBlob(gitRemoved, "removed file", "Text")
 
@@ -209,17 +210,20 @@ func TestIndex(t *testing.T) {
 
 	index(idx)
 
-	require.Equal(t, 3, submit.indexed)
+	require.Equal(t, 4, submit.indexed)
 	require.Equal(t, 1, submit.removed)
 
 	require.Equal(t, parentIDString+"_"+added.Path, submit.indexedID[0])
 	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": added, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[0])
 
-	require.Equal(t, parentIDString+"_"+modified.Path, submit.indexedID[1])
-	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
+	require.Equal(t, parentIDString+"_"+binary.Path, submit.indexedID[1])
+	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": binary, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
 
-	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[2])
-	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[2])
+	require.Equal(t, parentIDString+"_"+modified.Path, submit.indexedID[2])
+	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[2])
+
+	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[3])
+	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[3])
 
 	require.Equal(t, parentIDString+"_"+removed.Path, submit.removedID[0])
 
