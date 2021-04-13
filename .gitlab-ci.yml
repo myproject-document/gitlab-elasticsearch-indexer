@@ -87,8 +87,16 @@ test 1.15-es7:
   extends: .test-es7
   image: golang:1.15
 
+test 1.16:
+  extends: .test-es6
+  image: golang:1.16
+
+test 1.16-es7:
+  extends: .test-es7
+  image: golang:1.16
+
 lint:go-mod:
-  image: golang:1.15
+  image: golang:1.16
   stage: test
   script:
     - go mod tidy
@@ -102,7 +110,7 @@ lint:go-mod:
       fi
 
 code_navigation:
-  image: golang:1.15
+  image: golang:1.16
   allow_failure: true
   script:
     - go get github.com/sourcegraph/lsif-go/cmd/lsif-go
