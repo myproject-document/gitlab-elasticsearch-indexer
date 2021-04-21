@@ -129,6 +129,12 @@ const indexProperties = `
 				"search_analyzer": "code_search_analyzer",
 				"type": "text"
 			},
+			"multi_purpose_content": {
+				"type": "nGram",
+				"index_options": "positions",
+				"min_gram": 3,
+				"max_gram": 3
+			},
 			"file_name": {
 				"analyzer": "code_analyzer",
 				"search_analyzer": "code_search_analyzer",

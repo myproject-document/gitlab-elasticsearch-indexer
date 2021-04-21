@@ -38,6 +38,7 @@ type Blob struct {
 	RepoID    string `json:"rid"`
 	CommitSHA string `json:"commit_sha"`
 	Content   string `json:"content"`
+	MultiPurposeContent   string `json:"multi_purpose_content"`
 	Path      string `json:"path"`
 
 	// Message copied from gitlab-elasticsearch-git:
@@ -103,6 +104,7 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		OID:       file.Oid,
 		CommitSHA: commitSHA,
 		Content:   content,
+		MultiPurposeContent:   content, // TODO: Only set when FF is enabled and don't set `content` in that case
 		Path:      filename,
 		Filename:  path.Base(filename),
 		Language:  DetectLanguage(filename, b),
