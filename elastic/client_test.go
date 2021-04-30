@@ -54,7 +54,7 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 			fmt.Fprintln(w, "RoleName")
 		case "/latest/meta-data/iam/security-credentials/RoleName":
 			if failAssume {
-				fmt.Fprintf(w, credsFailRespTmpl)
+				fmt.Fprintf(w, "%s", credsFailRespTmpl)
 			} else {
 				fmt.Fprintf(w, credsRespTmpl, expireOn)
 			}
@@ -63,6 +63,8 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 		case "/gitlab-index-test/doc/667":
 			time.Sleep(3 * time.Second)
 			fmt.Fprintln(w, "{}")
+		case "/latest/api/token":
+			http.Error(w, "Not Found", http.StatusNotFound)
 		default:
 			http.Error(w, "bad request", http.StatusBadRequest)
 		}
@@ -83,6 +85,7 @@ func TestResolveAWSCredentialsStatic(t *testing.T) {
 			"aws_secret_access_key": "static_secret_access_key"
 		}`,
 	))
+	require.NoError(err)
 
 	creds := elastic.ResolveAWSCredentials(config, awsConfig)
 	credsValue, err := creds.Get()
@@ -138,6 +141,7 @@ func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
 			"aws_profile":"test_aws_will_not_find"
 		}`,
 	))
+	require.NoError(err)
 
 	// Bypass shared aws credential config file
 	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
@@ -168,6 +172,7 @@ func TestResolveAWSCredentialsECSCredsProvider(t *testing.T) {
 			"aws_profile":"test_aws_will_not_find"
 		}`,
 	))
+	require.NoError(err)
 
 	// Bypass shared aws credential config file
 	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
