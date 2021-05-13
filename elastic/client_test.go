@@ -1,6 +1,7 @@
 package elastic_test
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/http"
@@ -58,8 +59,6 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 			} else {
 				fmt.Fprintf(w, credsRespTmpl, expireOn)
 			}
-		case "/": // HEAD request, health check
-			fmt.Fprintf(w, "")
 		case "/gitlab-index-test/doc/667":
 			time.Sleep(3 * time.Second)
 			fmt.Fprintln(w, "{}")
@@ -221,10 +220,13 @@ func TestAWSConfiguration(t *testing.T) {
 
 	client, err := elastic.NewClient(config, "the-correlation-id")
 	require.NoError(t, err)
+	// intiate a ClusterHealth API call to Elasticsearch since SetHealthcheck is set to false
+	_, err = client.Client.ClusterHealth().Do(context.Background())
+	require.NoError(t, err)
 	defer client.Close()
 
 	require.NotNil(t, req)
-	authRE := regexp.MustCompile(`\AAWS4-HMAC-SHA256 Credential=0/\d{8}/us-east-1/es/aws4_request, SignedHeaders=accept;content-type;date;host;x-amz-date, Signature=[a-f0-9]{64}\z`)
+	authRE := regexp.MustCompile(`\AAWS4-HMAC-SHA256 Credential=0/\d{8}/us-east-1/es/aws4_request, SignedHeaders=accept;content-type;date;host;x-amz-date;x-opaque-id, Signature=[a-f0-9]{64}\z`)
 	require.Regexp(t, authRE, req.Header.Get("Authorization"))
 	require.NotEqual(t, "", req.Header.Get("X-Amz-Date"))
 }
@@ -399,4 +401,21 @@ func TestClientTimeout(t *testing.T) {
 
 	_, err = client.Get(projectIDString)
 	require.NoError(err)
+}
+
+func TestHealthcheckIsDisabled(t *testing.T) {
+	var req *http.Request
+
+	f := func(w http.ResponseWriter, r *http.Request) {
+		req = r
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(f))
+	defer srv.Close()
+
+	client := setupTestClient(t)
+	require.NotNil(t, client)
+	defer client.Close()
+
+	require.Nil(t, req)
 }
