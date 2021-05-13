@@ -119,6 +119,8 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 
 	opts = append(opts, elastic.SetURL(config.URL...), elastic.SetSniff(false))
 
+	opts = append(opts, elastic.SetHealthcheck(false))
+
 	client, err := elastic.NewClient(opts...)
 	if err != nil {
 		return nil, err
