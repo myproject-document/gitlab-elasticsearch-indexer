@@ -136,6 +136,7 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 	bulk, err := client.BulkProcessor().
 		Workers(config.BulkWorkers).
 		BulkSize(config.MaxBulkSize).
+		RetryItemStatusCodes().
 		After(wrappedClient.afterCallback).
 		Do(context.Background())
 
