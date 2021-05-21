@@ -42,8 +42,7 @@ test-infra:
 	$Q docker-compose up -d
 
 test:
-	# install -race libs to speed up next run
-	$Q $(GO) test $(if $V,-v) -i -race $(GO_PACKAGES)
+	$Q $(GO) test $(if $V,-v) -i -race $(GO_PACKAGES) # install -race libs to speed up next run
 	$Q $(GO) vet $(GO_PACKAGES)
 	$Q GODEBUG=cgocheck=2 $(GO) test $(if $V,-v) -race $(GO_PACKAGES)
 
