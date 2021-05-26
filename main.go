@@ -4,6 +4,7 @@ import (
 	"flag"
 	"os"
 	"strconv"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	versionFlag     = flag.Bool("version", false, "Print the version and exit")
-	skipCommitsFlag = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
-	blobTypeFlag    = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
-	projectPathFlag = flag.String("project-path", "", "Project path")
+	versionFlag       = flag.Bool("version", false, "Print the version and exit")
+	skipCommitsFlag   = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
+	blobTypeFlag      = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
+	projectPathFlag   = flag.String("project-path", "", "Project path")
+	timeoutOptionFlag = flag.String("timeout", "", "The timeout of the process.  Empty string means no timeout. Accepted formats: '1s', '5m', '24h'")
 
 	// Overriden in the makefile
 	Version   = "dev"
@@ -37,7 +39,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] <project-id> <repo-path> ]", os.Args[0])
+		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] <project-id> <repo-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
@@ -52,6 +54,7 @@ func main() {
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
 	projectPath := *projectPathFlag
+	timeoutOption := *timeoutOptionFlag
 	correlationID := generateCorrelationID()
 
 	repo, err := git.NewGitalyClientFromEnv(repoPath, fromSHA, toSHA, correlationID, args[0], projectPath)
@@ -62,6 +65,19 @@ func main() {
 	esClient, err := elastic.FromEnv(projectID, correlationID)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if timeoutOption != "" {
+		timeout, err := time.ParseDuration(timeoutOption)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			log.Infof("Setting timeout to %s", timeout)
+
+			time.AfterFunc(timeout, func() {
+				log.Fatalf("The process has timed out after %s", timeout)
+			})
+		}
 	}
 
 	idx := indexer.NewIndexer(repo, esClient)

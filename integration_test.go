@@ -188,6 +188,24 @@ func TestIndexingRemovesFiles(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestIndexingTimeout(t *testing.T) {
+	checkDeps(t)
+	ensureGitalyRepository(t)
+	_, td := buildWorkingIndex(t)
+
+	defer td()
+
+	err, stdout, _ := run("", "e2c7507b72f55cc272bbd5fde5bfa46eb4aeeebf", "--timeout=1ns")
+
+	require.Error(t, err)
+	require.Regexp(t, `The process has timed out after 1ns`, stdout)
+
+	err, stdout, _ = run("", "e2c7507b72f55cc272bbd5fde5bfa46eb4aeeebf", "--timeout=100")
+
+	require.Error(t, err)
+	require.Regexp(t, `time: missing unit in duration`, stdout)
+}
+
 func TestIndexingFilesWithLongPath(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
