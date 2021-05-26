@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.12.0
+
+- Add --timeout option to the indexer !112
+
 ## v2.11.0
 
 - Disable health check for Elasticsearch !109
