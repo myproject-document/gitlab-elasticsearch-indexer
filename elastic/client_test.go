@@ -48,7 +48,7 @@ func (tr testResolver) EndpointFor(service, region string, opts ...func(*endpoin
 	return endpoints.ResolvedEndpoint{URL: tr.endpoint}, nil
 }
 
-func initTestServer(expireOn string, failAssume bool) *httptest.Server {
+func initTestServer(expireOn string, failAssume bool, provideToken bool) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/latest/meta-data/iam/security-credentials/":
@@ -63,7 +63,11 @@ func initTestServer(expireOn string, failAssume bool) *httptest.Server {
 			time.Sleep(3 * time.Second)
 			fmt.Fprintln(w, "{}")
 		case "/latest/api/token":
-			http.Error(w, "Not Found", http.StatusNotFound)
+			if provideToken {
+				fmt.Fprintf(w, "test-token")
+			} else {
+				http.Error(w, "Not Found", http.StatusNotFound)
+			}
 		default:
 			http.Error(w, "bad request", http.StatusBadRequest)
 		}
@@ -122,41 +126,47 @@ func TestResolveAWSEnvCredentials(t *testing.T) {
 	require.Equal("session-token", credsValue.SessionToken, "Expect session token to match")
 }
 
-func TestResolveAWSCredentialsEc2RoleProfile(t *testing.T) {
+func TestResolveAWSCredentialsEc2RoleProfiles(t *testing.T) {
 	require := require.New(t)
 
-	server := initTestServer("2014-12-16T01:51:37Z", false)
-	defer server.Close()
-
-	awsConfig := &aws.Config{
-		EndpointResolver: testResolver{endpoint: server.URL + "/latest"},
+	servers := [...]*httptest.Server{
+		initTestServer("2014-12-16T01:51:37Z", false, false),
+		initTestServer("2014-12-16T01:51:37Z", false, true),
 	}
 
-	config, err := elastic.ReadConfig(strings.NewReader(
-		`{
-			"url":["` + server.URL + `"],
-			"aws":true,
-			"aws_region":"us-east-1",
-			"aws_profile":"test_aws_will_not_find"
-		}`,
-	))
-	require.NoError(err)
+	for _, server := range servers {
+		defer server.Close()
 
-	// Bypass shared aws credential config file
-	os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
-	defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE")
+		awsConfig := &aws.Config{
+			EndpointResolver: testResolver{endpoint: server.URL + "/latest"},
+		}
 
-	creds := elastic.ResolveAWSCredentials(config, awsConfig)
-	credsValue, err := creds.Get()
-	require.NoError(err)
-	require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
-	require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
+		config, err := elastic.ReadConfig(strings.NewReader(
+			`{
+				"url":["` + server.URL + `"],
+				"aws":true,
+				"aws_region":"us-east-1",
+				"aws_profile":"test_aws_will_not_find"
+			}`,
+		))
+		require.NoError(err)
+
+		// Bypass shared aws credential config file
+		os.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/tmp/notexist")
+		defer os.Unsetenv("AWS_SHARED_CREDENTIALS_FILE")
+
+		creds := elastic.ResolveAWSCredentials(config, awsConfig)
+		credsValue, err := creds.Get()
+		require.NoError(err)
+		require.Equal("accessKey", credsValue.AccessKeyID, "Expect access key ID to match")
+		require.Equal("secret", credsValue.SecretAccessKey, "Expect secret access key to match")
+	}
 }
 
 func TestResolveAWSCredentialsECSCredsProvider(t *testing.T) {
 	require := require.New(t)
 
-	server := initTestServer("2014-12-16T01:51:37Z", false)
+	server := initTestServer("2014-12-16T01:51:37Z", false, false)
 	defer server.Close()
 
 	awsConfig := &aws.Config{
@@ -365,7 +375,7 @@ func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
 func TestClientTimeout(t *testing.T) {
 	require := require.New(t)
 
-	server := initTestServer("2014-12-16T01:51:37Z", false)
+	server := initTestServer("2014-12-16T01:51:37Z", false, false)
 	defer server.Close()
 
 	config := os.Getenv("ELASTIC_CONNECTION_INFO")
