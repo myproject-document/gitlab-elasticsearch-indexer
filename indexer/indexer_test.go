@@ -199,6 +199,7 @@ func TestIndex(t *testing.T) {
 	binary := validBlob(gitBinary, indexer.NoCodeContentMsgHolder, "Ninja")
 	modified := validBlob(gitModified, "modified file", "Text")
 	removed := validBlob(gitRemoved, "removed file", "Text")
+	tooBig := validBlob(gitTooBig, "", "Text")
 
 	repo.commits = append(repo.commits, gitCommit)
 	repo.added = append(repo.added, gitAdded, gitTooBig, gitBinary)
@@ -210,20 +211,23 @@ func TestIndex(t *testing.T) {
 
 	index(idx)
 
-	require.Equal(t, 4, submit.indexed)
+	require.Equal(t, 5, submit.indexed)
 	require.Equal(t, 1, submit.removed)
 
 	require.Equal(t, parentIDString+"_"+added.Path, submit.indexedID[0])
 	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": added, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[0])
 
-	require.Equal(t, parentIDString+"_"+binary.Path, submit.indexedID[1])
-	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": binary, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
+	require.Equal(t, parentIDString+"_"+tooBig.Path, submit.indexedID[1])
+	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": tooBig, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[1])
 
-	require.Equal(t, parentIDString+"_"+modified.Path, submit.indexedID[2])
-	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[2])
+	require.Equal(t, parentIDString+"_"+binary.Path, submit.indexedID[2])
+	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": binary, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[2])
 
-	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[3])
-	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[3])
+	require.Equal(t, parentIDString+"_"+modified.Path, submit.indexedID[3])
+	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[3])
+
+	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[4])
+	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[4])
 
 	require.Equal(t, parentIDString+"_"+removed.Path, submit.removedID[0])
 

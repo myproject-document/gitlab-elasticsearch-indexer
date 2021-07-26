@@ -44,10 +44,6 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 	blob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "blob", i.Encoder)
 	if err != nil {
-		if isSkipBlobErr(err) {
-			return nil
-		}
-
 		return fmt.Errorf("Blob %s: %s", f.Path, err)
 	}
 
@@ -62,10 +58,6 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
 	wikiBlob, err := BuildBlob(f, i.Submitter.ParentID(), toCommit, "wiki_blob", i.Encoder)
 	if err != nil {
-		if isSkipBlobErr(err) {
-			return nil
-		}
-
 		return fmt.Errorf("WikiBlob %s: %s", f.Path, err)
 	}
 

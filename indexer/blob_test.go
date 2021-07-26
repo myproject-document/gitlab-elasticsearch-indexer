@@ -35,13 +35,29 @@ func TestBuildBlob(t *testing.T) {
 	require.JSONEq(t, expectedJSON, string(actualJSON))
 }
 
-func TestBuildBlobSkipsLargeBlobs(t *testing.T) {
+func TestBuildBlobSkipsIndexingContentForLargeBlobs(t *testing.T) {
 	file := gitFile("foo/bar", "foo")
 	file.SkipTooLarge = true
+	expected := validBlob(file, "", "Text")
 
-	blob, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
-	require.Error(t, err, indexer.SkipTooLargeBlob)
-	require.Nil(t, blob)
+	actual, err := indexer.BuildBlob(file, parentID, sha, "blob", setupEncoder())
+	require.NoError(t, err)
+	require.Equal(t, expected, actual)
+
+	expectedJSON := `{
+		"commit_sha" : "` + expected.CommitSHA + `",
+		"content"    : "` + expected.Content + `",
+		"file_name"  : "` + expected.Filename + `",
+		"language"   : "` + expected.Language + `",
+		"oid"        : "` + expected.OID + `",
+		"path"       : "` + expected.Path + `",
+		"rid"        : "` + expected.RepoID + `",
+		"type"       : "blob"
+	}`
+
+	actualJSON, err := json.Marshal(actual)
+	require.NoError(t, err)
+	require.JSONEq(t, expectedJSON, string(actualJSON))
 }
 
 func TestBuildBlobBinaryBlobs(t *testing.T) {
