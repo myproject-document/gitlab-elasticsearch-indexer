@@ -3,7 +3,6 @@ package indexer
 import (
 	"bytes"
 	"crypto/sha1"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -14,22 +13,13 @@ import (
 )
 
 var (
-	SkipTooLargeBlob = fmt.Errorf("Blob should be skipped: Too large")
-
 	NoCodeContentMsgHolder = ""
 )
 
 const (
 	binarySearchLimit = 8 * 1024 // 8 KiB, Same as git
+	defaultLanguage   = "Text"
 )
-
-func isSkipBlobErr(err error) bool {
-	if errors.Is(err, SkipTooLargeBlob) {
-		return true
-	}
-
-	return false
-}
 
 type Blob struct {
 	Type      string `json:"type"`
@@ -74,30 +64,33 @@ func hashStr(s string) string {
 }
 
 func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string, encoder *Encoder) (*Blob, error) {
-	if file.SkipTooLarge {
-		return nil, SkipTooLargeBlob
-	}
-
-	reader, err := file.Blob()
-	if err != nil {
-		return nil, err
-	}
-
-	defer reader.Close()
-
-	// FIXME(nick): This doesn't look cheap. Check the RAM & CPU pressure, esp.
-	// for large blobs
-	b, err := ioutil.ReadAll(reader)
-	if err != nil {
-		return nil, err
-	}
-
 	content := NoCodeContentMsgHolder
-	if !DetectBinary(b) {
-		content = encoder.tryEncodeBytes(b)
+	language := defaultLanguage
+	filename := encoder.tryEncodeString(file.Path)
+
+	// Do not read files that are too large
+	if !file.SkipTooLarge {
+		reader, err := file.Blob()
+		if err != nil {
+			return nil, err
+		}
+
+		defer reader.Close()
+
+		// FIXME(nick): This doesn't look cheap. Check the RAM & CPU pressure, esp.
+		// for large blobs
+		b, err := ioutil.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+
+		if !DetectBinary(b) {
+			content = encoder.tryEncodeBytes(b)
+		}
+
+		language = DetectLanguage(filename, b)
 	}
 
-	filename := encoder.tryEncodeString(file.Path)
 	blob := &Blob{
 		ID:        GenerateBlobID(parentID, filename),
 		OID:       file.Oid,
@@ -105,7 +98,7 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		Content:   content,
 		Path:      filename,
 		Filename:  path.Base(filename),
-		Language:  DetectLanguage(filename, b),
+		Language:  language,
 	}
 
 	switch blobType {
@@ -130,7 +123,7 @@ func DetectLanguage(filename string, data []byte) string {
 		return lang.Name
 	}
 
-	return "Text"
+	return defaultLanguage
 }
 
 // DetectBinary checks whether the passed-in data contains a NUL byte. Only scan
