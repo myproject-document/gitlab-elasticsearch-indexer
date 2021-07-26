@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.13.0
+
+- Only index file name in case of file size over max limit !76
+
 ## v2.12.0
 
 - Add --timeout option to the indexer !112
