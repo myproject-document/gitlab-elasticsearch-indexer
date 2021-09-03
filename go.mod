@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.27.0
 	github.com/deoxxa/aws_signing_client v0.0.0-20161109131055-c20ee106809e
 	github.com/fortytw2/leaktest v1.3.0 // indirect
+	github.com/go-enry/go-enry/v2 v2.7.1
 	github.com/mailru/easyjson v0.0.0-20190403194419-1ea4449da983 // indirect
 	github.com/olivere/elastic v6.2.24+incompatible
 	github.com/sirupsen/logrus v1.7.1
