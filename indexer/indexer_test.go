@@ -196,7 +196,11 @@ func TestIndex(t *testing.T) {
 
 	commit := validCommit(gitCommit)
 	added := validBlob(gitAdded, "added file", "Text")
-	binary := validBlob(gitBinary, indexer.NoCodeContentMsgHolder, "Ninja")
+
+	// If the content is binary, no results (Text) will be returned. This matches the
+	// behavior of Linguist.detect: https://github.com/github/linguist/blob/aad49acc0624c70d654a8dce447887dbbc713c7a/lib/linguist.rb#L14-L49
+	binary := validBlob(gitBinary, indexer.NoCodeContentMsgHolder, "Text")
+
 	modified := validBlob(gitModified, "modified file", "Text")
 	removed := validBlob(gitRemoved, "removed file", "Text")
 	tooBig := validBlob(gitTooBig, "", "Text")

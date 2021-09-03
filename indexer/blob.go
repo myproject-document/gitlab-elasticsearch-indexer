@@ -8,8 +8,8 @@ import (
 	"path"
 	"strconv"
 
+	"github.com/go-enry/go-enry/v2"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
-	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/linguist"
 )
 
 var (
@@ -118,9 +118,9 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 //
 // If no language is detected, "Text" is returned.
 func DetectLanguage(filename string, data []byte) string {
-	lang := linguist.DetectLanguage(filename, data)
-	if lang != nil {
-		return lang.Name
+	lang := enry.GetLanguage(filename, data)
+	if len(lang) != 0 {
+		return lang
 	}
 
 	return defaultLanguage
