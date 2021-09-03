@@ -1,6 +1,6 @@
 module gitlab.com/gitlab-org/gitlab-elasticsearch-indexer
 
-go 1.15
+go 1.16
 
 require (
 	github.com/aws/aws-sdk-go v1.27.0
