@@ -113,15 +113,12 @@ go test -v gitlab.com/gitlab-org/gitlab-elasticsearch-indexer -run TestIndexingG
 
 ### Testing in gdk
 
-You can test changes to the indexer in your GDK by modifying [GITLAB_ELASTICSEARCH_INDEXER_VERSION](https://gitlab.com/gitlab-org/gitlab/-/blob/main/GITLAB_ELASTICSEARCH_INDEXER_VERSION) to point to the branch name containing the changes.
+You can test changes to the indexer in your GDK by building the `gitlab-elasticsearch-indexer` and using the `PREFIX` env variable to change the installation directory to the gdk directory. Running `gdk update` will reset the `gitlab-elasticsearch-indexer` back to the current supported version.
 
-
-## Default branch
-
-GitLab Elasticsearch Indexer is transitioning its default branch from `master` to `main`. For now,
-both branches are valid. All changes go to the `main` branch and are synced manually
-to `master` by the maintainers. We plan to remove the `master` branch as soon as
-possible. The current status is being tracked in [issue 71](https://gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/-/issues/71).
+Example:
+```bash
+PREFIX=<gdk_install_directory>/gitlab-elasticsearch-indexer make install
+```
 
 ## Contributing
 
