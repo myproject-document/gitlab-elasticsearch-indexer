@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"path"
 	"strconv"
 
@@ -79,7 +79,7 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 
 		// FIXME(nick): This doesn't look cheap. Check the RAM & CPU pressure, esp.
 		// for large blobs
-		b, err := ioutil.ReadAll(reader)
+		b, err := io.ReadAll(reader)
 		if err != nil {
 			return nil, err
 		}

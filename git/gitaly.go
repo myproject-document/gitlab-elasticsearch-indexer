@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -268,7 +267,7 @@ func (gc *gitalyClient) getBlob(oid string) (io.ReadCloser, error) {
 		}
 	}
 
-	return ioutil.NopCloser(data), nil
+	return io.NopCloser(data), nil
 }
 
 func (gc *gitalyClient) gitalyBuildFile(change *pb.GetRawChangesResponse_RawChange, path string) (*File, error) {
@@ -278,7 +277,7 @@ func (gc *gitalyClient) gitalyBuildFile(change *pb.GetRawChangesResponse_RawChan
 	// as they will be rejected on the indexer side anyway
 	// Ideally, we need to create a lazy blob reader here.
 	if change.Size > gc.limitFileSize {
-		data = ioutil.NopCloser(new(bytes.Buffer))
+		data = io.NopCloser(new(bytes.Buffer))
 		skipTooLarge = true
 	} else {
 		var err error
