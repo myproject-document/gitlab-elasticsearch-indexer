@@ -3,7 +3,7 @@ package git_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"sort"
 	"testing"
@@ -314,7 +314,7 @@ func TestEachFileChangeAllModifications(t *testing.T) {
 	file := putFiles["VERSION"]
 	blob, err := file.Blob()
 	require.NoError(t, err)
-	data, err := ioutil.ReadAll(blob)
+	data, err := io.ReadAll(blob)
 	require.NoError(t, err)
 
 	require.Equal(t, "VERSION", file.Path)
@@ -369,7 +369,7 @@ func TestEachFileSkipsFilesLargerThanLimitFileSize(t *testing.T) {
 	require.Equal(t, true, file.SkipTooLarge)
 	blob, err := file.Blob()
 	require.NoError(t, err)
-	data, err := ioutil.ReadAll(blob)
+	data, err := io.ReadAll(blob)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(data))
 }

@@ -3,7 +3,6 @@ package indexer_test
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path"
 	"strings"
 	"testing"
@@ -109,7 +108,7 @@ func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 
 func readerFunc(data string, err error) func() (io.ReadCloser, error) {
 	return func() (io.ReadCloser, error) {
-		return ioutil.NopCloser(strings.NewReader(data)), err
+		return io.NopCloser(strings.NewReader(data)), err
 	}
 }
 

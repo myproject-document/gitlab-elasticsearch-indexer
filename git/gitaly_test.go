@@ -1,7 +1,6 @@
 package git
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -16,7 +15,7 @@ const (
 )
 
 func startUnixSocketListener() (net.Listener, error) {
-	tmpfile, err := ioutil.TempFile("", "gitaly.*.socket")
+	tmpfile, err := os.CreateTemp("", "gitaly.*.socket")
 	if err != nil {
 		return nil, err
 	}
