@@ -103,10 +103,7 @@ code_navigation:
     reports:
       lsif: dump.lsif
 
-gosec-sast:
-  before_script:
-    - apk add make pkgconfig icu-dev
-    - make install
+gosec-sast:  
   rules: *workflow_rules
 
 gemnasium-dependency_scanning:
