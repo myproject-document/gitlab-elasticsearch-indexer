@@ -94,11 +94,10 @@ lint:go-mod:
       fi
 
 code_navigation:
-  image: golang:1.17
+  image: sourcegraph/lsif-go:v1
   allow_failure: true
   script:
     - apt-get update && apt-get -yy install libicu-dev
-    - go get github.com/sourcegraph/lsif-go/cmd/lsif-go
     - lsif-go
   artifacts:
     reports:
