@@ -1,5 +1,9 @@
 # GitLab Elasticsearch Indexer
 
+## v2.16.0
+
+- Drop deprecated -i flag from test target
+
 ## v2.15.0
 
 - Drop support for go version 1.15
