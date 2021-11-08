@@ -44,7 +44,7 @@ PREFIX=/usr sudo -E make install
 Test suite expects Gitaly and Elasticsearch to be run, on the following ports:
 
   - Gitaly: 8075
-  - ElasticSearch v7.9.2: 9201
+  - ElasticSearch v7.14.2: 9201
 
 ### Quick tests
 
