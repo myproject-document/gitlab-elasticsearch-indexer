@@ -10,6 +10,6 @@ services:
   elasticsearch:
     environment:
       - discovery.type=single-node
-    image: elasticsearch:7.9.2
+    image: elasticsearch:7.14.2
     ports:
       - '9201:9200'
