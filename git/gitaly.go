@@ -15,9 +15,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	gitalyauth "gitlab.com/gitlab-org/gitaly/auth"
-	gitalyclient "gitlab.com/gitlab-org/gitaly/client"
-	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
+	gitalyauth "gitlab.com/gitlab-org/gitaly/v14/auth"
+	gitalyclient "gitlab.com/gitlab-org/gitaly/v14/client"
+	pb "gitlab.com/gitlab-org/gitaly/v14/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/labkit/correlation"
 	grpccorrelation "gitlab.com/gitlab-org/labkit/correlation/grpc"
 )
