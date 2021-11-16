@@ -185,7 +185,7 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 
 			switch change.Operation.String() {
 			case "DELETED", "RENAMED":
-				path := string(change.OldPath)
+				path := string(change.OldPathBytes)
 				log.Debug("Indexing blob change: ", "DELETE", path)
 				if err = del(path); err != nil {
 					return err
@@ -194,7 +194,7 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 
 			switch change.Operation.String() {
 			case "ADDED", "RENAMED", "MODIFIED", "COPIED":
-				file, err := gc.gitalyBuildFile(change, string(change.NewPath))
+				file, err := gc.gitalyBuildFile(change, string(change.NewPathBytes))
 				if err != nil {
 					return err
 				}
