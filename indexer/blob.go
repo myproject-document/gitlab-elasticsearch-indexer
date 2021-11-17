@@ -42,6 +42,8 @@ type Blob struct {
 	//https://github.com/elastic/elasticsearch-mapper-attachments/issues/124
 	Filename string `json:"file_name"`
 
+	Extension string `json:"extension"`
+
 	Language string `json:"language"`
 }
 
@@ -98,6 +100,7 @@ func BuildBlob(file *git.File, parentID int64, commitSHA string, blobType string
 		Content:   content,
 		Path:      filename,
 		Filename:  path.Base(filename),
+		Extension: path.Ext(filename),
 		Language:  language,
 	}
 
