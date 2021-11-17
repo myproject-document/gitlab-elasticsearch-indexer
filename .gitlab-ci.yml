@@ -47,7 +47,7 @@ include:
     - name: elasticsearch:6.8.15
       command: ["elasticsearch", "-E", "discovery.type=single-node"]
       alias: elasticsearch
-    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
+    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:master
       # Disable the hooks so we don't have to stub the GitLab API
       command: ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && exec /usr/bin/env GITALY_TESTING_NO_GIT_HOOKS=1 /scripts/process-wrapper"]
       alias: gitaly
@@ -58,7 +58,7 @@ include:
     - name: elasticsearch:7.14.2
       command: ["elasticsearch", "-E", "discovery.type=single-node"]
       alias: elasticsearch
-    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:latest
+    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:master
       # Disable the hooks so we don't have to stub the GitLab API
       command: ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && exec /usr/bin/env GITALY_TESTING_NO_GIT_HOOKS=1 /scripts/process-wrapper"]
       alias: gitaly
