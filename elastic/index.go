@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// indexMapping is used as an example for testing purposes only and is 
+// indexMapping is used as an example for testing purposes only and is
 // not intended to be kept synchronized with GitLab
 const indexMapping = `
 {
@@ -133,6 +133,9 @@ const indexProperties = `
 				"analyzer": "code_analyzer",
 				"search_analyzer": "code_search_analyzer",
 				"type": "text"
+			},
+			"extension": {
+				"type": "keyword"
 			},
 			"id": {
 				"normalizer": "sha_normalizer",
@@ -398,7 +401,7 @@ func (c *Client) createIndex(mapping string) error {
 // CreateIndex creates an index matching that created by gitlab-rails.
 func (c *Client) CreateWorkingIndex() error {
 	mapping := strings.Replace(indexMapping, "__PROPERTIES__", indexProperties, -1)
-		
+
 	return c.createIndex(mapping)
 }
 
