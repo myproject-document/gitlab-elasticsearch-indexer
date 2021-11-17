@@ -49,6 +49,7 @@ func TestBuildBlobSkipsIndexingContentForLargeBlobs(t *testing.T) {
 		"commit_sha" : "` + expected.CommitSHA + `",
 		"content"    : "` + expected.Content + `",
 		"file_name"  : "` + expected.Filename + `",
+		"extension"  : "` + expected.Extension + `",
 		"language"   : "` + expected.Language + `",
 		"oid"        : "` + expected.OID + `",
 		"path"       : "` + expected.Path + `",

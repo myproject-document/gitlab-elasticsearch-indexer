@@ -148,6 +148,7 @@ func validBlob(file *git.File, content, language string) *indexer.Blob {
 		Content:   content,
 		Path:      file.Path,
 		Filename:  path.Base(file.Path),
+		Extension: path.Ext(file.Path),
 		Language:  language,
 	}
 }
