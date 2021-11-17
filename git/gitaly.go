@@ -15,9 +15,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
-	gitalyauth "gitlab.com/gitlab-org/gitaly/auth"
-	gitalyclient "gitlab.com/gitlab-org/gitaly/client"
-	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
+	gitalyauth "gitlab.com/gitlab-org/gitaly/v14/auth"
+	gitalyclient "gitlab.com/gitlab-org/gitaly/v14/client"
+	pb "gitlab.com/gitlab-org/gitaly/v14/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/labkit/correlation"
 	grpccorrelation "gitlab.com/gitlab-org/labkit/correlation/grpc"
 )
@@ -300,15 +300,18 @@ func getBlobReader(data io.ReadCloser) func() (io.ReadCloser, error) {
 }
 
 func (gc *gitalyClient) EachCommit(f CommitFunc) error {
-	request := &pb.CommitsBetweenRequest{
+	request := &pb.ListCommitsRequest{
 		Repository: gc.repository,
-		From:       []byte(gc.FromHash),
-		To:         []byte(gc.ToHash),
+		Revisions: []string{
+			"^" + gc.FromHash,
+			gc.ToHash,
+		},
+		Reverse: true,
 	}
 
-	stream, err := gc.commitServiceClient.CommitsBetween(gc.ctx, request)
+	stream, err := gc.commitServiceClient.ListCommits(gc.ctx, request)
 	if err != nil {
-		return fmt.Errorf("could not call rpc.CommitsBetween: %v", err)
+		return fmt.Errorf("could not call rpc.ListCommits: %v", err)
 	}
 
 	for {
@@ -317,7 +320,7 @@ func (gc *gitalyClient) EachCommit(f CommitFunc) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error calling rpc.CommitsBetween: %v", err)
+			return fmt.Errorf("error calling rpc.ListCommits: %v", err)
 		}
 		for _, cmt := range c.Commits {
 			commit := &Commit{

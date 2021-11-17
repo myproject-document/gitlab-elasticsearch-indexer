@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 
-	gitalyClient "gitlab.com/gitlab-org/gitaly/client"
-	pb "gitlab.com/gitlab-org/gitaly/proto/go/gitalypb"
+	gitalyClient "gitlab.com/gitlab-org/gitaly/v14/client"
+	pb "gitlab.com/gitlab-org/gitaly/v14/proto/go/gitalypb"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 )
 
