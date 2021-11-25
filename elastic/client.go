@@ -18,8 +18,7 @@ import (
 )
 
 var (
-	timeoutError        = fmt.Errorf("Timeout")
-	envCorrelationIDKey = "CORRELATION_ID"
+	timeoutError = fmt.Errorf("Timeout")
 )
 
 type Client struct {

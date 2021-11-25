@@ -210,7 +210,10 @@ func TestAWSConfiguration(t *testing.T) {
 		req = r
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{}`))
+		_, err := w.Write([]byte(`{}`))
+		if err != nil {
+			require.NoError(t, err)
+		}
 	}
 
 	srv := httptest.NewTLSServer(http.HandlerFunc(f))
@@ -347,7 +350,10 @@ func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
 		req = r
 
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{}`))
+		_, err := w.Write([]byte(`{}`))
+		if err != nil {
+			require.NoError(t, err)
+		}
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(f))

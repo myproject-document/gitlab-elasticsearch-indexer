@@ -93,6 +93,12 @@ lint:go-mod:
         exit 1
       fi
 
+lint:golangci:
+  image: golangci/golangci-lint:v1.43.0
+  stage: test
+  script:
+    - golangci-lint run -v --disable-all -E errcheck -E deadcode -E ineffassign -E structcheck -E typecheck -E varcheck
+
 code_navigation:
   image: sourcegraph/lsif-go:v1
   allow_failure: true

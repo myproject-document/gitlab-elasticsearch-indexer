@@ -212,7 +212,9 @@ func TestIndex(t *testing.T) {
 	join_data_blob := map[string]string{"name": "blob", "parent": "project_" + parentIDString}
 	join_data_commit := map[string]string{"name": "commit", "parent": "project_" + parentIDString}
 
-	index(idx)
+	err := index(idx)
+
+	require.NoError(t, err)
 
 	require.Equal(t, 5, submit.indexed)
 	require.Equal(t, 1, submit.removed)
