@@ -39,7 +39,10 @@ type gitalyConnectionInfo struct {
 func init() {
 	gci, exists := os.LookupEnv("GITALY_CONNECTION_INFO")
 	if exists {
-		json.Unmarshal([]byte(gci), &gitalyConnInfo)
+		err := json.Unmarshal([]byte(gci), &gitalyConnInfo)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
