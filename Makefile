@@ -8,6 +8,13 @@ GO = _support/go
 LOCAL_GO_FILES = $(shell find . -type f -name '*.go' -not -path './.go' -not -path './.go/*')
 GO_PACKAGES = $(shell go list ./...)
 
+# run_go_tests will execute Go tests with all required parameters. Its
+# behaviour can be modified via the following variables:
+#
+# TEST_OPTIONS: any additional options
+# GO_PACKAGES: packages which shall be tested
+run_go_tests = $(GO) test $(if $V,-v) -race ${TEST_OPTIONS} $(GO_PACKAGES)
+
 # V := 1 # When V is set, print commands and build progress.
 
 .PHONY: all
@@ -42,13 +49,14 @@ test-infra:
 	$Q docker-compose up -d
 
 test:
-	$Q $(GO) test $(if $V,-v) -race $(GO_PACKAGES) # install -race libs to speed up next run
+	$Q $(call run_go_tests) # install -race libs to speed up next run
 	$Q $(GO) vet $(GO_PACKAGES)
 	$Q GODEBUG=cgocheck=2 $(GO) test $(if $V,-v) -race $(GO_PACKAGES)
 
+cover: TEST_OPTIONS  := ${TEST_OPTIONS} -cover -coverprofile=tmp/test.coverage
 cover: tmp
 	@echo "NOTE: make cover does not exit 1 on failure, don't use it to check for tests success!"
-	$Q $(GO) test -short -cover -coverprofile=tmp/test.coverage $(GO_PACKAGFES)
+	$Q $(call run_go_tests)
 	$Q $(GO) tool cover -html tmp/test.coverage -o tmp/test.coverage.html
 	@echo ""
 	@echo "=====> Total test coverage: <====="
@@ -68,7 +76,7 @@ Q := $(if $V,,@)
 
 .PHONY: tmp
 tmp:
-	mkdir tmp
+	mkdir -p tmp
 
 bin/goimports:
 	$Q $(GO) build -o bin/goimports golang.org/x/tools/cmd/goimports
