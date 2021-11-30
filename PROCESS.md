@@ -6,6 +6,7 @@ GitLab Elasticsearch Indexer has the following maintainers:
 
 - Nick Thomas `@nick.thomas`
 - Dylan Griffith `@DylanGriffith`
+- Dmitry Gruzd `@dgruzd`
 
 This list is defined at https://about.gitlab.com/team/
 
