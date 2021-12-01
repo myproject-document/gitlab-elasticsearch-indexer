@@ -39,6 +39,29 @@ Example:
 PREFIX=/usr sudo -E make install
 ```
 
+## Lefthook static analysis
+
+[Lefthook](https://github.com/evilmartians/lefthook) is a Git hooks manager that allows
+custom logic to be executed prior to Git committing or pushing. `gitlab-elasticsearch-indexer`
+comes with Lefthook configuration (`lefthook.yml`), but it must be installed.
+
+We have a `lefthook.yml` checked in but it is ignored until Lefthook is installed.
+
+### Install Lefthook
+
+1. [Install `lefthook`](https://github.com/evilmartians/lefthook/blob/master/docs/full_guide.md#installation)
+1. Install Lefthook Git hooks:
+
+   ```shell
+   lefthook install
+   ```
+
+1. Test Lefthook is working by running the Lefthook `pre-push` Git hook:
+
+   ```shell
+   lefthook run pre-push
+   ```
+
 ## Run tests
 
 Test suite expects Gitaly and Elasticsearch to be run, on the following ports:

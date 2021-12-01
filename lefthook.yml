@@ -1,0 +1,26 @@
+definitions:
+  commands:
+    files: &staged_files git diff --name-only --diff-filter=d --staged
+    files: &committed_files git diff --name-only --diff-filter=d $(git merge-base origin/main HEAD)..HEAD
+    run: &golangci if command -v golangci-lint 2> /dev/null; then golangci-lint run; else echo "golangci-lint is not found. Install golangci-lint"; fi
+pre-commit:
+  parallel: true
+  commands:
+    compile: &compile
+      files: *staged_files
+      glob: "*.{go,mod,sum}"
+      run: make
+    golangci_lint: &golangci_lint
+      tags: lint
+      files: *staged_files
+      glob: "*.go"
+      run: *golangci
+pre-push:
+  parallel: true
+  commands:
+    compile:
+      <<: *compile
+      files: *committed_files
+    golangci_lint:
+      <<: *golangci_lint
+      files: *committed_files
