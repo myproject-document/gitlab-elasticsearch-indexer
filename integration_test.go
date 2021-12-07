@@ -26,17 +26,26 @@ var (
 )
 
 const (
-	projectID         = 667
-	projectIDString   = "667"
-	headSHA           = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
-	testRepo          = "test-gitlab-elasticsearch-indexer/gitlab-test.git"
-	testRepoPath      = "https://gitlab.com/gitlab-org/gitlab-test.git"
-	testRepoNamespace = "test-gitlab-elasticsearch-indexer"
+	projectID             = 667
+	projectIDString       = "667"
+	headSHA               = "b83d6e391c22777fca1ed3012fce84f633d7fed0"
+	testRepo              = "test-gitlab-elasticsearch-indexer/gitlab-test.git"
+	testRepoPath          = "https://gitlab.com/gitlab-org/gitlab-test.git"
+	testRepoNamespace     = "test-gitlab-elasticsearch-indexer"
+	visibilityLevel       = int8(10)
+	repositoryAccessLevel = int8(20)
 )
 
 type gitalyConnectionInfo struct {
 	Address string `json:"address"`
 	Storage string `json:"storage"`
+}
+
+func validProjectPermissions() *indexer.ProjectPermissions {
+	return &indexer.ProjectPermissions{
+		VisibilityLevel:       visibilityLevel,
+		RepositoryAccessLevel: repositoryAccessLevel,
+	}
 }
 
 func init() {
@@ -119,7 +128,13 @@ func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
 func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 	setElasticsearchConnectionInfo(t)
 
-	client, err := elastic.FromEnv(projectID, "the-correlation-id")
+	config, err := elastic.ConfigFromEnv()
+	require.NoError(t, err)
+
+	config.Permissions = validProjectPermissions()
+	config.ProjectID = projectID
+
+	client, err := elastic.NewClient(config, "the-correlation-id")
 	require.NoError(t, err)
 
 	if working {

@@ -14,17 +14,20 @@ import (
 )
 
 var (
-	versionFlag       = flag.Bool("version", false, "Print the version and exit")
-	skipCommitsFlag   = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
-	blobTypeFlag      = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
-	projectPathFlag   = flag.String("project-path", "", "Project path")
-	timeoutOptionFlag = flag.String("timeout", "", "The timeout of the process.  Empty string means no timeout. Accepted formats: '1s', '5m', '24h'")
+	versionFlag               = flag.Bool("version", false, "Print the version and exit")
+	skipCommitsFlag           = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
+	blobTypeFlag              = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
+	visibilityLevelFlag       = flag.Int("visibility-level", -1, "Project visbility_access_level. Accepted values: 0, 10, 20")
+	repositoryAccessLevelFlag = flag.Int("repository-access-level", -1, "Project repository_access_level. Accepted values: 0, 10, 20")
+	projectPathFlag           = flag.String("project-path", "", "Project path")
+	timeoutOptionFlag         = flag.String("timeout", "", "The timeout of the process.  Empty string means no timeout. Accepted formats: '1s', '5m', '24h'")
 
 	// Overriden in the makefile
 	Version   = "dev"
 	BuildTime = ""
 
 	envCorrelationIDKey = "CORRELATION_ID"
+	Permissions         *indexer.ProjectPermissions
 )
 
 func main() {
@@ -39,7 +42,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] <project-id> <repo-path> ]", os.Args[0])
+		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
@@ -62,7 +65,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	esClient, err := elastic.FromEnv(projectID, correlationID)
+	config := loadConfig(projectID)
+
+	esClient, err := elastic.NewClient(config, correlationID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,7 +88,7 @@ func main() {
 	idx := indexer.NewIndexer(repo, esClient)
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
-	log.Debugf("Index: %s, Project ID: %v, blob_type: %s, skip_commits?: %t", esClient.IndexName, esClient.ParentID(), blobType, skipCommits)
+	log.Debugf("Index Name: %s, Project ID: %v, blob_type: %s, skip_commits?: %t, Permissions: %v", esClient.IndexName, esClient.ParentID(), blobType, skipCommits, Permissions)
 
 	if err := idx.IndexBlobs(blobType); err != nil {
 		log.Fatalln("Indexing error: ", err)
@@ -109,6 +114,17 @@ func configureLogger() {
 	}
 }
 
+func loadConfig(projectID int64) *elastic.Config {
+	config, err := elastic.ConfigFromEnv()
+	if err != nil {
+		log.Fatal(err)
+	}
+	config.Permissions = generateProjectPermissions()
+	config.ProjectID = projectID
+
+	return config
+}
+
 func generateCorrelationID() string {
 	var err error
 
@@ -122,4 +138,19 @@ func generateCorrelationID() string {
 	}
 
 	return cid
+}
+
+func generateProjectPermissions() *indexer.ProjectPermissions {
+	visibilityLevel := *visibilityLevelFlag
+	repositoryAccessLevel := *repositoryAccessLevelFlag
+
+	if visibilityLevel == -1 || repositoryAccessLevel == -1 {
+		return nil
+	}
+
+	permissions := new(indexer.ProjectPermissions)
+	permissions.VisibilityLevel = int8(visibilityLevel)
+	permissions.RepositoryAccessLevel = int8(repositoryAccessLevel)
+
+	return permissions
 }

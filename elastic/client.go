@@ -15,6 +15,7 @@ import (
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/deoxxa/aws_signing_client"
 	"github.com/olivere/elastic"
+	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
 
 var (
@@ -24,15 +25,16 @@ var (
 type Client struct {
 	IndexName   string
 	ProjectID   int64
+	Permissions *indexer.ProjectPermissions
 	maxBulkSize int
 	Client      *elastic.Client
 	bulk        *elastic.BulkProcessor
 	bulkFailed  bool
 }
 
-// FromEnv creates an Elasticsearch client from the `ELASTIC_CONNECTION_INFO`
+// ConfigFromEnv creates a Config from the `ELASTIC_CONNECTION_INFO`
 // environment variable
-func FromEnv(projectID int64, correlationID string) (*Client, error) {
+func ConfigFromEnv() (*Config, error) {
 	data := strings.NewReader(os.Getenv("ELASTIC_CONNECTION_INFO"))
 
 	config, err := ReadConfig(data)
@@ -49,9 +51,7 @@ func FromEnv(projectID int64, correlationID string) (*Client, error) {
 		config.IndexName = indexName
 	}
 
-	config.ProjectID = projectID
-
-	return NewClient(config, correlationID)
+	return config, nil
 }
 
 func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
@@ -67,7 +67,8 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 
 	// bulk response can be nil in some cases, we must check first
 	if response != nil && response.Errors {
-		numFailed := len(response.Failed())
+		failedBulkResponseItems := response.Failed()
+		numFailed := len(failedBulkResponseItems)
 		if numFailed > 0 {
 			c.bulkFailed = true
 			total := numFailed + len(response.Succeeded())
@@ -128,6 +129,7 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 	wrappedClient := &Client{
 		IndexName:   config.IndexName,
 		ProjectID:   config.ProjectID,
+		Permissions: config.Permissions,
 		maxBulkSize: config.MaxBulkSize,
 		Client:      client,
 	}
@@ -171,6 +173,10 @@ func ResolveAWSCredentials(config *Config, awsConfig *aws.Config) *credentials.C
 
 func (c *Client) ParentID() int64 {
 	return c.ProjectID
+}
+
+func (c *Client) ProjectPermissions() *indexer.ProjectPermissions {
+	return c.Permissions
 }
 
 func (c *Client) Flush() error {

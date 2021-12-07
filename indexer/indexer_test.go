@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	sha            = "9876543210987654321098765432109876543210"
-	oid            = "0123456789012345678901234567890123456789"
-	parentID       = int64(667)
-	parentIDString = "667"
+	sha                   = "9876543210987654321098765432109876543210"
+	oid                   = "0123456789012345678901234567890123456789"
+	parentID              = int64(667)
+	parentIDString        = "667"
+	visibilityLevel       = int8(10)
+	repositoryAccessLevel = int8(20)
 )
 
 func setupEncoder() *indexer.Encoder {
@@ -46,6 +48,11 @@ type fakeRepository struct {
 
 func (f *fakeSubmitter) ParentID() int64 {
 	return parentID
+}
+
+func (f *fakeSubmitter) ProjectPermissions() *indexer.ProjectPermissions {
+	projectPermissions := validProjectPermissions()
+	return &projectPermissions
 }
 
 func (f *fakeSubmitter) Index(id string, thing interface{}) {
@@ -164,6 +171,13 @@ func validCommit(gitCommit *git.Commit) *indexer.Commit {
 	}
 }
 
+func validProjectPermissions() indexer.ProjectPermissions {
+	return indexer.ProjectPermissions{
+		VisibilityLevel:       visibilityLevel,
+		RepositoryAccessLevel: repositoryAccessLevel,
+	}
+}
+
 func index(idx *indexer.Indexer) error {
 	if err := idx.IndexBlobs("blob"); err != nil {
 		return err
@@ -232,7 +246,7 @@ func TestIndex(t *testing.T) {
 	require.Equal(t, map[string]interface{}{"project_id": parentID, "blob": modified, "join_field": join_data_blob, "type": "blob"}, submit.indexedThing[3])
 
 	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[4])
-	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit"}, submit.indexedThing[4])
+	require.Equal(t, map[string]interface{}{"commit": commit, "join_field": join_data_commit, "type": "commit", "visibility_level": visibilityLevel, "repository_access_level": repositoryAccessLevel}, submit.indexedThing[4])
 
 	require.Equal(t, parentIDString+"_"+removed.Path, submit.removedID[0])
 

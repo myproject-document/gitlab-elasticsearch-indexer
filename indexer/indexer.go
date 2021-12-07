@@ -9,6 +9,7 @@ import (
 
 type Submitter interface {
 	ParentID() int64
+	ProjectPermissions() *ProjectPermissions
 
 	Index(id string, thing interface{})
 	Remove(id string)
@@ -20,6 +21,11 @@ type Indexer struct {
 	git.Repository
 	Submitter
 	Encoder *Encoder
+}
+
+type ProjectPermissions struct {
+	VisibilityLevel       int8
+	RepositoryAccessLevel int8
 }
 
 func NewIndexer(repository git.Repository, submitter Submitter) *Indexer {
@@ -35,9 +41,16 @@ func (i *Indexer) submitCommit(c *git.Commit) error {
 
 	joinData := map[string]string{
 		"name":   "commit",
-		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
+		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID()),
+	}
 
-	i.Submitter.Index(commit.ID, map[string]interface{}{"commit": commit, "type": "commit", "join_field": joinData})
+	commitBody := map[string]interface{}{"commit": commit, "type": "commit", "join_field": joinData}
+
+	if permissions := i.Submitter.ProjectPermissions(); permissions != nil {
+		commitBody["visibility_level"] = permissions.VisibilityLevel
+		commitBody["repository_access_level"] = permissions.RepositoryAccessLevel
+	}
+	i.Submitter.Index(commit.ID, commitBody)
 	return nil
 }
 

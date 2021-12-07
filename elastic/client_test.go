@@ -245,15 +245,18 @@ func TestAWSConfiguration(t *testing.T) {
 }
 
 func setupTestClient(t *testing.T) *elastic.Client {
-	config := os.Getenv("ELASTIC_CONNECTION_INFO")
-	if config == "" {
+	if os.Getenv("ELASTIC_CONNECTION_INFO") == "" {
 		t.Log("ELASTIC_CONNECTION_INFO not set")
 		t.SkipNow()
 	}
 
 	os.Setenv("RAILS_ENV", fmt.Sprintf("test-elastic-%d", time.Now().Unix()))
 
-	client, err := elastic.FromEnv(projectID, "test-correlation-id")
+	config, err := elastic.ConfigFromEnv()
+	require.NoError(t, err)
+	config.ProjectID = projectID
+
+	client, err := elastic.NewClient(config, "test-correlation-id")
 	require.NoError(t, err)
 
 	require.Equal(t, projectID, client.ParentID())
