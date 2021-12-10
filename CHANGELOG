@@ -1,5 +1,12 @@
 # GitLab Elasticsearch Indexer
 
+## v2.17.0
+
+- Fix usage of out-of-date Gitaly version !133
+- Gitaly: Convert from CommitsBetween to ListCommits !132
+- Support indexing project permissions for commit documents !130
+- Fix go 1.17 build on macOS !139
+
 ## v2.16.0
 
 - Drop deprecated -i flag from test target
