@@ -20,7 +20,7 @@ type Submitter interface {
 type Indexer struct {
 	git.Repository
 	Submitter
-	Encoder *Encoder
+	*Encoder
 }
 
 type ProjectPermissions struct {
@@ -37,7 +37,7 @@ func NewIndexer(repository git.Repository, submitter Submitter) *Indexer {
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
-	commit := BuildCommit(c, i.Submitter.ParentID(), i.Encoder)
+	commit := i.BuildCommit(c)
 
 	joinData := map[string]string{
 		"name":   "commit",
