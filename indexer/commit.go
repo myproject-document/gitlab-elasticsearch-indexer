@@ -21,16 +21,16 @@ func GenerateCommitID(parentID int64, commitSHA string) string {
 	return fmt.Sprintf("%v_%s", parentID, commitSHA)
 }
 
-func BuildCommit(c *git.Commit, parentID int64, encoder *Encoder) *Commit {
+func (i *Indexer) BuildCommit(c *git.Commit) *Commit {
 	sha := c.Hash
 
 	return &Commit{
 		Type:      "commit",
-		Author:    BuildPerson(c.Author, encoder),
-		Committer: BuildPerson(c.Committer, encoder),
-		ID:        GenerateCommitID(parentID, sha),
-		RepoID:    strconv.FormatInt(parentID, 10),
-		Message:   encoder.tryEncodeString(c.Message),
+		Author:    BuildPerson(c.Author, i.Encoder),
+		Committer: BuildPerson(c.Committer, i.Encoder),
+		ID:        GenerateCommitID(i.Submitter.ParentID(), sha),
+		RepoID:    strconv.FormatInt(i.Submitter.ParentID(), 10),
+		Message:   i.Encoder.tryEncodeString(c.Message),
 		SHA:       sha,
 	}
 }
