@@ -196,7 +196,7 @@ func (c *Client) Close() {
 func (c *Client) Index(id string, thing interface{}) {
 	req := elastic.NewBulkIndexRequest().
 		Index(c.IndexName).
-		Type("doc").
+		Type("_doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
 		Doc(thing)
@@ -208,7 +208,7 @@ func (c *Client) Index(id string, thing interface{}) {
 func (c *Client) Get(id string) (*elastic.GetResult, error) {
 	return c.Client.Get().
 		Index(c.IndexName).
-		Type("doc").
+		Type("_doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
 		Do(context.TODO())
@@ -225,7 +225,7 @@ func (c *Client) GetBlob(path string) (*elastic.GetResult, error) {
 func (c *Client) Remove(id string) {
 	req := elastic.NewBulkDeleteRequest().
 		Index(c.IndexName).
-		Type("doc").
+		Type("_doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id)
 
