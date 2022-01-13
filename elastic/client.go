@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/deoxxa/aws_signing_client"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
 
