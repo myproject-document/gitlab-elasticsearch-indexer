@@ -305,7 +305,6 @@ func TestIndexingGitlabTest(t *testing.T) {
 	commit, err := c.GetCommit(headSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
-	require.Equal(t, "_doc", commit.Type)
 	require.Equal(t, projectIDString+"_"+headSHA, commit.Id)
 	require.Equal(t, "project_"+projectIDString, commit.Routing)
 
@@ -343,7 +342,6 @@ func TestIndexingGitlabTest(t *testing.T) {
 	blob, err := c.GetBlob("README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
-	require.Equal(t, "_doc", blob.Type)
 	require.Equal(t, projectIDString+"_README.md", blob.Id)
 	require.Equal(t, "project_"+projectIDString, blob.Routing)
 
@@ -407,7 +405,6 @@ func TestIndexingWikiBlobs(t *testing.T) {
 	blob, err := c.GetBlob("README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
-	require.Equal(t, "_doc", blob.Type)
 	require.Equal(t, projectIDString+"_README.md", blob.Id)
 	require.Equal(t, "project_"+projectIDString, blob.Routing)
 
