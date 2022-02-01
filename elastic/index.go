@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// indexMapping is used as an example for testing purposes only and is 
+// indexMapping is used as an example for testing purposes only and is
 // not intended to be kept synchronized with GitLab
-const indexMapping = `
+const defaultIndexMapping = `
 {
 	"settings": {
 		"analysis": {
@@ -105,7 +105,7 @@ const indexMapping = `
 	}
 }`
 
-const indexProperties = `
+const defaultIndexProperties = `
 {
 	"archived": {
 		"type": "boolean"
@@ -357,14 +357,77 @@ const indexProperties = `
 }
 `
 
+const commitsIndexProperties = `
+{
+	"type": {
+		"type": "keyword"
+	},
+	"visibility_level": {
+		"type": "integer"
+	},
+	"repository_access_level": {
+		"type": "integer"
+	},
+	"author": {
+		"properties": {
+			"email": {
+				"index_options": "docs",
+				"type": "text"
+			},
+			"name": {
+				"index_options": "docs",
+				"type": "text"
+			},
+			"time": {
+				"format": "basic_date_time_no_millis",
+				"type": "date"
+			}
+		}
+	},
+	"committer": {
+		"properties": {
+			"email": {
+				"index_options": "docs",
+				"type": "text"
+			},
+			"name": {
+				"index_options": "docs",
+				"type": "text"
+			},
+			"time": {
+				"format": "basic_date_time_no_millis",
+				"type": "date"
+			}
+		}
+	},
+	"id": {
+		"normalizer": "sha_normalizer",
+		"index_options": "docs",
+		"type": "keyword"
+	},
+	"message": {
+		"index_options": "positions",
+		"type": "text"
+	},
+	"rid": {
+		"type": "keyword"
+	},
+	"sha": {
+		"normalizer": "sha_normalizer",
+		"index_options": "docs",
+		"type": "keyword"
+	}
+}
+`
+
 // createIndex creates an index matching that created by GitLab
-func (c *Client) createIndex(mapping string) error {
+func (c *Client) createIndex(indexName, mapping string) error {
 	info, err := c.Client.NodesInfo().Do(context.Background())
 	if err != nil {
 		return err
 	}
 
-	createIndexService := c.Client.CreateIndex(c.IndexName).BodyString(mapping)
+	createIndexService := c.Client.CreateIndex(indexName).BodyString(mapping)
 
 	for _, node := range info.Nodes {
 		// Grab the first character of the version string and turn it into an int
@@ -396,21 +459,27 @@ func (c *Client) createIndex(mapping string) error {
 }
 
 // CreateIndex creates an index matching that created by gitlab-rails.
-func (c *Client) CreateWorkingIndex() error {
-	mapping := strings.Replace(indexMapping, "__PROPERTIES__", indexProperties, -1)
-		
-	return c.createIndex(mapping)
+func (c *Client) CreateDefaultWorkingIndex() error {
+	mapping := strings.Replace(defaultIndexMapping, "__PROPERTIES__", defaultIndexProperties, -1)
+
+	return c.createIndex(c.IndexNameDefault, mapping)
+}
+
+func (c *Client) CreateCommitsWorkingIndex() error {
+	mapping := strings.Replace(defaultIndexMapping, "__PROPERTIES__", commitsIndexProperties, -1)
+
+	return c.createIndex(c.IndexNameCommits, mapping)
 }
 
 // For testing
-func (c *Client) CreateBrokenIndex() error {
-	mapping := strings.Replace(indexMapping, "__PROPERTIES__", "{}", -1)
+func (c *Client) CreateDefaultBrokenIndex() error {
+	mapping := strings.Replace(defaultIndexMapping, "__PROPERTIES__", "{}", -1)
 
-	return c.createIndex(mapping)
+	return c.createIndex(c.IndexNameDefault, mapping)
 }
 
-func (c *Client) DeleteIndex() error {
-	deleteIndex, err := c.Client.DeleteIndex(c.IndexName).Do(context.Background())
+func (c *Client) DeleteIndex(indexName string) error {
+	deleteIndex, err := c.Client.DeleteIndex(indexName).Do(context.Background())
 	if err != nil {
 		return err
 	}

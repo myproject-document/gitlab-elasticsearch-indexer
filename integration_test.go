@@ -61,7 +61,7 @@ func init() {
 func TestIndexingRenamesFiles(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 
 	defer td()
 
@@ -117,16 +117,16 @@ func checkDeps(t *testing.T) {
 	}
 }
 
-func buildWorkingIndex(t *testing.T) (*elastic.Client, func()) {
-	return buildIndex(t, true)
+func buildWorkingIndex(t *testing.T, separateIndexForCommits bool) (*elastic.Client, func()) {
+	return buildIndex(t, true, separateIndexForCommits)
 }
 
 func buildBrokenIndex(t *testing.T) (*elastic.Client, func()) {
-	return buildIndex(t, false)
+	return buildIndex(t, false, false)
 }
 
-func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
-	setElasticsearchConnectionInfo(t)
+func buildIndex(t *testing.T, working, separateIndexForCommits bool) (*elastic.Client, func()) {
+	setElasticsearchConnectionInfo(t, separateIndexForCommits)
 
 	config, err := elastic.ConfigFromEnv()
 	require.NoError(t, err)
@@ -138,25 +138,39 @@ func buildIndex(t *testing.T, working bool) (*elastic.Client, func()) {
 	require.NoError(t, err)
 
 	if working {
-		require.NoError(t, client.CreateWorkingIndex())
+		require.NoError(t, client.CreateDefaultWorkingIndex())
+
+		if separateIndexForCommits {
+			require.NoError(t, client.CreateCommitsWorkingIndex())
+		}
 	} else {
-		require.NoError(t, client.CreateBrokenIndex())
+		require.NoError(t, client.CreateDefaultBrokenIndex())
 	}
 
 	return client, func() {
-		err := client.DeleteIndex()
+		err := client.DeleteIndex(client.IndexNameDefault)
 		if err != nil {
 			require.NoError(t, err)
+		}
+
+		if working && separateIndexForCommits {
+			err := client.DeleteIndex(client.IndexNameCommits)
+			if err != nil {
+				require.NoError(t, err)
+			}
 		}
 	}
 }
 
 // Substitude index_name with a dynamically generated one
-func setElasticsearchConnectionInfo(t *testing.T) {
+func setElasticsearchConnectionInfo(t *testing.T, separateIndexForCommits bool) {
 	config, err := elastic.ReadConfig(strings.NewReader(os.Getenv("ELASTIC_CONNECTION_INFO")))
 	require.NoError(t, err)
 
-	config.IndexName = fmt.Sprintf("%s-%d", config.IndexName, time.Now().Unix())
+	config.IndexNameDefault = fmt.Sprintf("%s-%d", config.IndexNameDefault, time.Now().Unix())
+	if separateIndexForCommits {
+		config.IndexNameCommits = fmt.Sprintf("%s-commits-%d", config.IndexNameDefault, time.Now().Unix())
+	}
 	out, err := json.Marshal(config)
 	require.NoError(t, err)
 
@@ -192,7 +206,7 @@ func run(from, to string, args ...string) (error, string, string) {
 func TestIndexingRemovesFiles(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 
 	defer td()
 
@@ -212,7 +226,7 @@ func TestIndexingRemovesFiles(t *testing.T) {
 func TestIndexingTimeout(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	_, td := buildWorkingIndex(t)
+	_, td := buildWorkingIndex(t, false)
 
 	defer td()
 
@@ -230,7 +244,7 @@ func TestIndexingTimeout(t *testing.T) {
 func TestIndexingFilesWithLongPath(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 
 	defer td()
 
@@ -254,7 +268,7 @@ type document struct {
 func TestIndexingTranscodesToUTF8(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 	defer td()
 
 	err, _, _ := run("", headSHA)
@@ -295,7 +309,7 @@ func TestElasticClientIndexMismatch(t *testing.T) {
 func TestIndexingGitlabTest(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 	defer td()
 
 	err, _, _ := run("", headSHA)
@@ -389,10 +403,55 @@ func TestIndexingGitlabTest(t *testing.T) {
 	require.Equal(t, expectedDate, cDoc.Commit.Committer.Time)
 }
 
+func TestIndexingCommits(t *testing.T) {
+	checkDeps(t)
+	ensureGitalyRepository(t)
+	c, td := buildWorkingIndex(t, true)
+	defer td()
+
+	err, _, _ := run("", headSHA)
+	require.NoError(t, err)
+
+	// Check the indexing of a commit
+	commit, err := c.GetCommit(headSHA)
+	require.NoError(t, err)
+	require.True(t, commit.Found)
+	require.Equal(t, "doc", commit.Type)
+	require.Equal(t, projectIDString+"_"+headSHA, commit.Id)
+	require.Equal(t, "project_"+projectIDString, commit.Routing)
+
+	commitDoc := make(map[string]interface{})
+	require.NoError(t, json.Unmarshal(*commit.Source, &commitDoc))
+
+	date, err := time.Parse("20060102T150405-0700", "20160927T143746+0000")
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		map[string]interface{}{
+			"type": "commit",
+			"sha":  headSHA,
+			"author": map[string]interface{}{
+				"email": "job@gitlab.com",
+				"name":  "Job van der Voort",
+				"time":  date.Local().Format("20060102T150405-0700"),
+			},
+			"committer": map[string]interface{}{
+				"email": "job@gitlab.com",
+				"name":  "Job van der Voort",
+				"time":  date.Local().Format("20060102T150405-0700"),
+			},
+			"rid":     projectIDString,
+			"message": "Merge branch 'branch-merged' into 'master'\r\n\r\nadds bar folder and branch-test text file to check Repository merged_to_root_ref method\r\n\r\n\r\n\r\nSee merge request !12",
+		},
+		commitDoc,
+	)
+}
+
 func TestIndexingWikiBlobs(t *testing.T) {
 	checkDeps(t)
 	ensureGitalyRepository(t)
-	c, td := buildWorkingIndex(t)
+	c, td := buildWorkingIndex(t, false)
 	defer td()
 
 	err, _, _ := run("", headSHA, "--blob-type=wiki_blob", "--skip-commits")

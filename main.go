@@ -88,7 +88,7 @@ func main() {
 	idx := indexer.NewIndexer(repo, esClient)
 
 	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
-	log.Debugf("Index Name: %s, Project ID: %v, blob_type: %s, skip_commits?: %t, Permissions: %v", esClient.IndexName, esClient.ParentID(), blobType, skipCommits, Permissions)
+	log.Debugf("Default Index Name: %s, Commits Index Name: %s, Project ID: %v, blob_type: %s, skip_commits?: %t, Permissions: %v", esClient.IndexNameDefault, esClient.IndexNameCommits, esClient.ParentID(), blobType, skipCommits, Permissions)
 
 	if err := idx.IndexBlobs(blobType); err != nil {
 		log.Fatalln("Indexing error: ", err)

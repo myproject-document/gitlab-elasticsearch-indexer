@@ -255,6 +255,7 @@ func setupTestClient(t *testing.T) *elastic.Client {
 	config, err := elastic.ConfigFromEnv()
 	require.NoError(t, err)
 	config.ProjectID = projectID
+	config.IndexNameCommits = config.IndexNameDefault + "-commits"
 
 	client, err := elastic.NewClient(config, "test-correlation-id")
 	require.NoError(t, err)
@@ -266,7 +267,8 @@ func setupTestClient(t *testing.T) *elastic.Client {
 
 func setupTestClientAndCreateIndex(t *testing.T) *elastic.Client {
 	client := setupTestClient(t)
-	require.NoError(t, client.CreateWorkingIndex())
+	require.NoError(t, client.CreateDefaultWorkingIndex())
+	require.NoError(t, client.CreateCommitsWorkingIndex())
 
 	return client
 }
@@ -275,10 +277,10 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	client := setupTestClientAndCreateIndex(t)
 
 	blobDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_foo", blobDoc)
+	client.Index("blob", projectIDString+"_foo", blobDoc)
 
 	commitDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_0000", commitDoc)
+	client.Index("commit", projectIDString+"_0000", commitDoc)
 
 	require.NoError(t, client.Flush())
 
@@ -290,7 +292,7 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, true, commit.Found)
 
-	client.Remove(projectIDString + "_foo")
+	client.Remove("blob", projectIDString+"_foo")
 	require.NoError(t, client.Flush())
 
 	_, err = client.GetBlob("foo")
@@ -299,10 +301,11 @@ func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	// indexing a doc with unexpected field will cause an ES strict_dynamic_mapping_exception
 	// for our IndexMapping
 	blobDocInvalid := map[string]interface{}{fmt.Sprintf("invalid-key-%d", time.Now().Unix()): ""}
-	client.Index(projectIDString+"_invalid", blobDocInvalid)
+	client.Index("blob", projectIDString+"_invalid", blobDocInvalid)
 	require.Error(t, client.Flush())
 
-	require.NoError(t, client.DeleteIndex())
+	require.NoError(t, client.DeleteIndex(client.IndexNameDefault))
+	require.NoError(t, client.DeleteIndex(client.IndexNameCommits))
 }
 
 func TestFlushErrorWithESActionRequestValidationException(t *testing.T) {
@@ -310,9 +313,9 @@ func TestFlushErrorWithESActionRequestValidationException(t *testing.T) {
 
 	// set IndexName empty here to simulate ES action_request_validation_exception,
 	// so that the `err` param passed to `afterFunc` is not nil
-	client.IndexName = ""
+	client.IndexNameDefault = ""
 	blobDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_foo", blobDoc)
+	client.Index("blob", projectIDString+"_foo", blobDoc)
 
 	require.Error(t, client.Flush())
 }
@@ -326,7 +329,7 @@ func TestElasticReadConfig(t *testing.T) {
 	))
 	require.NoError(t, err)
 
-	require.Equal(t, "foobar", config.IndexName)
+	require.Equal(t, "foobar", config.IndexNameDefault)
 	require.Equal(t, []string{"http://elasticsearch:9200"}, config.URL)
 	require.Equal(t, elastic.DefaultMaxBulkSize, config.MaxBulkSize)
 	require.Equal(t, elastic.DefaultBulkWorkers, config.BulkWorkers)
@@ -374,7 +377,7 @@ func TestCorrelationIdForwardedAsXOpaqueId(t *testing.T) {
 	require.NoError(t, err)
 
 	blobDoc := map[string]interface{}{}
-	client.Index(projectIDString+"_foo", blobDoc)
+	client.Index("blob", projectIDString+"_foo", blobDoc)
 	require.NoError(t, client.Flush())
 
 	require.NotNil(t, req)
@@ -401,7 +404,7 @@ func TestClientTimeout(t *testing.T) {
 	client := setupTestClient(t)
 	require.NotNil(client)
 
-	_, err := client.Get(projectIDString)
+	_, err := client.Get("blob", projectIDString)
 	require.Error(
 		err,
 		"context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
@@ -418,7 +421,7 @@ func TestClientTimeout(t *testing.T) {
 	client = setupTestClient(t)
 	require.NotNil(client)
 
-	_, err = client.Get(projectIDString)
+	_, err = client.Get("blob", projectIDString)
 	require.NoError(err)
 }
 

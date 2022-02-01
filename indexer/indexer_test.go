@@ -34,6 +34,8 @@ type fakeSubmitter struct {
 	indexedID    []string
 	indexedThing []interface{}
 
+	useSeparateIndexForCommits bool
+
 	removed   int
 	removedID []string
 }
@@ -55,15 +57,19 @@ func (f *fakeSubmitter) ProjectPermissions() *indexer.ProjectPermissions {
 	return &projectPermissions
 }
 
-func (f *fakeSubmitter) Index(id string, thing interface{}) {
+func (f *fakeSubmitter) Index(documentType, id string, thing interface{}) {
 	f.indexed++
 	f.indexedID = append(f.indexedID, id)
 	f.indexedThing = append(f.indexedThing, thing)
 }
 
-func (f *fakeSubmitter) Remove(id string) {
+func (f *fakeSubmitter) Remove(documentType, id string) {
 	f.removed++
 	f.removedID = append(f.removedID, id)
+}
+
+func (f *fakeSubmitter) UseSeparateIndexForCommits() bool {
+	return f.useSeparateIndexForCommits
 }
 
 func (f *fakeSubmitter) Flush() error {
@@ -106,9 +112,11 @@ func (r *fakeRepository) GetLimitFileSize() int64 {
 	return 1024 * 1024
 }
 
-func setupIndexer() (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
+func setupIndexer(useSeparateIndexForCommits bool) (*indexer.Indexer, *fakeRepository, *fakeSubmitter) {
 	repo := &fakeRepository{}
-	submitter := &fakeSubmitter{}
+	submitter := &fakeSubmitter{
+		useSeparateIndexForCommits: useSeparateIndexForCommits,
+	}
 
 	return indexer.NewIndexer(repo, submitter), repo, submitter
 }
@@ -195,7 +203,7 @@ func index(idx *indexer.Indexer) error {
 }
 
 func TestIndex(t *testing.T) {
-	idx, repo, submit := setupIndexer()
+	idx, repo, submit := setupIndexer(false)
 
 	gitCommit := gitCommit("Initial commit")
 	gitAdded := gitFile("foo/bar", "added file")
@@ -253,8 +261,33 @@ func TestIndex(t *testing.T) {
 	require.Equal(t, submit.flushed, 1)
 }
 
+func TestCommitIndex(t *testing.T) {
+	idx, repo, submit := setupIndexer(true)
+
+	gitCommit := gitCommit("Initial commit")
+	commit := validCommit(gitCommit)
+
+	repo.commits = append(repo.commits, gitCommit)
+
+	err := index(idx)
+
+	require.NoError(t, err)
+
+	require.Equal(t, 1, submit.indexed)
+
+	require.Equal(t, parentIDString+"_"+commit.SHA, submit.indexedID[0])
+	commitMap, err := commit.ToMap()
+	require.NoError(t, err)
+
+	commitMap["visibility_level"] = visibilityLevel
+	commitMap["repository_access_level"] = repositoryAccessLevel
+	require.Equal(t, commitMap, submit.indexedThing[0])
+
+	require.Equal(t, submit.flushed, 1)
+}
+
 func TestErrorIndexingSkipsRemainder(t *testing.T) {
-	idx, repo, submit := setupIndexer()
+	idx, repo, submit := setupIndexer(false)
 
 	gitOKFile := gitFile("ok", "")
 

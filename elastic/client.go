@@ -23,13 +23,14 @@ var (
 )
 
 type Client struct {
-	IndexName   string
-	ProjectID   int64
-	Permissions *indexer.ProjectPermissions
-	maxBulkSize int
-	Client      *elastic.Client
-	bulk        *elastic.BulkProcessor
-	bulkFailed  bool
+	IndexNameDefault string
+	IndexNameCommits string
+	ProjectID        int64
+	Permissions      *indexer.ProjectPermissions
+	maxBulkSize      int
+	Client           *elastic.Client
+	bulk             *elastic.BulkProcessor
+	bulkFailed       bool
 }
 
 // ConfigFromEnv creates a Config from the `ELASTIC_CONNECTION_INFO`
@@ -42,16 +43,20 @@ func ConfigFromEnv() (*Config, error) {
 		return nil, fmt.Errorf("Couldn't parse ELASTIC_CONNECTION_INFO: %s", err)
 	}
 
-	if config.IndexName == "" {
+	if config.IndexNameDefault == "" {
 		railsEnv := os.Getenv("RAILS_ENV")
 		indexName := "gitlab"
 		if railsEnv != "" {
 			indexName = indexName + "-" + railsEnv
 		}
-		config.IndexName = indexName
+		config.IndexNameDefault = indexName
 	}
 
 	return config, nil
+}
+
+func (c *Client) UseSeparateIndexForCommits() bool {
+	return c.IndexNameCommits != "" && c.IndexNameCommits != c.IndexNameDefault
 }
 
 func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableRequest, response *elastic.BulkResponse, err error) {
@@ -127,11 +132,12 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 	}
 
 	wrappedClient := &Client{
-		IndexName:   config.IndexName,
-		ProjectID:   config.ProjectID,
-		Permissions: config.Permissions,
-		maxBulkSize: config.MaxBulkSize,
-		Client:      client,
+		IndexNameDefault: config.IndexNameDefault,
+		IndexNameCommits: config.IndexNameCommits,
+		ProjectID:        config.ProjectID,
+		Permissions:      config.Permissions,
+		maxBulkSize:      config.MaxBulkSize,
+		Client:           client,
 	}
 
 	bulk, err := client.BulkProcessor().
@@ -193,9 +199,17 @@ func (c *Client) Close() {
 	c.Client.Stop()
 }
 
-func (c *Client) Index(id string, thing interface{}) {
+func (c *Client) indexNameFor(documentType string) string {
+	if documentType == "commit" && c.IndexNameCommits != "" {
+		return c.IndexNameCommits
+	} else {
+		return c.IndexNameDefault
+	}
+}
+
+func (c *Client) Index(documentType, id string, thing interface{}) {
 	req := elastic.NewBulkIndexRequest().
-		Index(c.IndexName).
+		Index(c.indexNameFor(documentType)).
 		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
@@ -205,9 +219,9 @@ func (c *Client) Index(id string, thing interface{}) {
 }
 
 // We only really use this for tests
-func (c *Client) Get(id string) (*elastic.GetResult, error) {
+func (c *Client) Get(documentType, id string) (*elastic.GetResult, error) {
 	return c.Client.Get().
-		Index(c.IndexName).
+		Index(c.indexNameFor(documentType)).
 		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
@@ -215,16 +229,16 @@ func (c *Client) Get(id string) (*elastic.GetResult, error) {
 }
 
 func (c *Client) GetCommit(id string) (*elastic.GetResult, error) {
-	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, id))
+	return c.Get("commit", fmt.Sprintf("%v_%v", c.ProjectID, id))
 }
 
 func (c *Client) GetBlob(path string) (*elastic.GetResult, error) {
-	return c.Get(fmt.Sprintf("%v_%v", c.ProjectID, path))
+	return c.Get("blob", fmt.Sprintf("%v_%v", c.ProjectID, path))
 }
 
-func (c *Client) Remove(id string) {
+func (c *Client) Remove(documentType, id string) {
 	req := elastic.NewBulkDeleteRequest().
-		Index(c.IndexName).
+		Index(c.indexNameFor(documentType)).
 		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id)
