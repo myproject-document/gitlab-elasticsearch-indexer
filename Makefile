@@ -13,6 +13,7 @@ GO_PACKAGES = $(shell go list ./...)
 #
 # TEST_OPTIONS: any additional options
 # GO_PACKAGES: packages which shall be tested
+TEST_OPTIONS = -timeout 1m
 run_go_tests = $(GO) test $(if $V,-v) -race ${TEST_OPTIONS} $(GO_PACKAGES)
 
 # V := 1 # When V is set, print commands and build progress.
