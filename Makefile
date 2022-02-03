@@ -16,6 +16,15 @@ GO_PACKAGES = $(shell go list ./...)
 TEST_OPTIONS = -timeout 1m
 run_go_tests = $(GO) test $(if $V,-v) -race ${TEST_OPTIONS} $(GO_PACKAGES)
 
+MACOS_HOMEBREW_PREFIX := $(shell command -v brew > /dev/null 2>&1 && brew --prefix || true)
+
+# PKG_CONFIG_PATH needs to explicitly be set for macOS platforms
+PKG_CONFIG_PATH := ${PKG_CONFIG_PATH}
+
+ifneq ($(MACOS_HOMEBREW_PREFIX),)
+PKG_CONFIG_PATH := ${PKG_CONFIG_PATH}:${MACOS_HOMEBREW_PREFIX}/opt/icu4c/lib/pkgconfig
+endif
+
 # V := 1 # When V is set, print commands and build progress.
 
 .PHONY: all
@@ -23,7 +32,7 @@ all: build
 
 .PHONY: build
 build:
-	$Q $(GO) build $(if $V,-v) $(VERSION_FLAGS) -o bin/gitlab-elasticsearch-indexer .
+	$Q PKG_CONFIG_PATH="${PKG_CONFIG_PATH}" $(GO) build $(if $V,-v) $(VERSION_FLAGS) -o bin/gitlab-elasticsearch-indexer .
 
 install: build
 	install -d ${PREFIX}/bin
