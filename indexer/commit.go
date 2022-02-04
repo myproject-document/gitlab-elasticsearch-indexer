@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -15,6 +16,17 @@ type Commit struct {
 	RepoID    string  `json:"rid"`
 	Message   string  `json:"message"`
 	SHA       string  `json:"sha"`
+}
+
+func (c *Commit) ToMap() (newMap map[string]interface{}, err error) {
+	data, err := json.Marshal(c) // Convert to a json string
+
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(data, &newMap) // Convert to a map
+	return
 }
 
 func GenerateCommitID(parentID int64, commitSHA string) string {

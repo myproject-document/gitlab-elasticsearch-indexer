@@ -11,8 +11,10 @@ type Submitter interface {
 	ParentID() int64
 	ProjectPermissions() *ProjectPermissions
 
-	Index(id string, thing interface{})
-	Remove(id string)
+	Index(documentType, id string, thing interface{})
+	Remove(documentType, id string)
+
+	UseSeparateIndexForCommits() bool
 
 	Flush() error
 }
@@ -21,6 +23,7 @@ type Indexer struct {
 	git.Repository
 	Submitter
 	*Encoder
+	separateIndexForCommits bool
 }
 
 type ProjectPermissions struct {
@@ -30,27 +33,39 @@ type ProjectPermissions struct {
 
 func NewIndexer(repository git.Repository, submitter Submitter) *Indexer {
 	return &Indexer{
-		Repository: repository,
-		Submitter:  submitter,
-		Encoder:    NewEncoder(repository.GetLimitFileSize()),
+		Repository:              repository,
+		Submitter:               submitter,
+		Encoder:                 NewEncoder(repository.GetLimitFileSize()),
+		separateIndexForCommits: submitter.UseSeparateIndexForCommits(),
 	}
 }
 
 func (i *Indexer) submitCommit(c *git.Commit) error {
 	commit := i.BuildCommit(c)
 
-	joinData := map[string]string{
-		"name":   "commit",
-		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID()),
-	}
+	commitBody := make(map[string]interface{})
 
-	commitBody := map[string]interface{}{"commit": commit, "type": "commit", "join_field": joinData}
+	if i.separateIndexForCommits {
+		var err error
+		commitBody, err = commit.ToMap()
+
+		if err != nil {
+			return fmt.Errorf("Commit %s, %s", c.Hash, err)
+		}
+	} else {
+		commitBody["commit"] = commit
+		commitBody["type"] = "commit"
+		commitBody["join_field"] = map[string]string{
+			"name":   "commit",
+			"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID()),
+		}
+	}
 
 	if permissions := i.Submitter.ProjectPermissions(); permissions != nil {
 		commitBody["visibility_level"] = permissions.VisibilityLevel
 		commitBody["repository_access_level"] = permissions.RepositoryAccessLevel
 	}
-	i.Submitter.Index(commit.ID, commitBody)
+	i.Submitter.Index("commit", commit.ID, commitBody)
 	return nil
 }
 
@@ -64,7 +79,7 @@ func (i *Indexer) submitRepoBlob(f *git.File, _, toCommit string) error {
 		"name":   "blob",
 		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
 
-	i.Submitter.Index(blob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": blob, "type": "blob", "join_field": joinData})
+	i.Submitter.Index("blob", blob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": blob, "type": "blob", "join_field": joinData})
 	return nil
 }
 
@@ -78,14 +93,14 @@ func (i *Indexer) submitWikiBlob(f *git.File, _, toCommit string) error {
 		"name":   "wiki_blob",
 		"parent": fmt.Sprintf("project_%v", i.Submitter.ParentID())}
 
-	i.Submitter.Index(wikiBlob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": wikiBlob, "type": "wiki_blob", "join_field": joinData})
+	i.Submitter.Index("wiki_blob", wikiBlob.ID, map[string]interface{}{"project_id": i.Submitter.ParentID(), "blob": wikiBlob, "type": "wiki_blob", "join_field": joinData})
 	return nil
 }
 
 func (i *Indexer) removeBlob(path string) error {
 	blobID := GenerateBlobID(i.Submitter.ParentID(), path)
 
-	i.Submitter.Remove(blobID)
+	i.Submitter.Remove("wiki_blob", blobID)
 	return nil
 }
 

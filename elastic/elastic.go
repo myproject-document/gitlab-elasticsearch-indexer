@@ -15,17 +15,18 @@ const (
 )
 
 type Config struct {
-	IndexName      string                      `json:"index_name"`
-	ProjectID      int64                       `json:"-"`
-	Permissions    *indexer.ProjectPermissions `json:"-"`
-	URL            []string                    `json:"url"`
-	AWS            bool                        `json:"aws"`
-	Region         string                      `json:"aws_region"`
-	AccessKey      string                      `json:"aws_access_key"`
-	SecretKey      string                      `json:"aws_secret_access_key"`
-	MaxBulkSize    int                         `json:"max_bulk_size_bytes"`
-	BulkWorkers    int                         `json:"max_bulk_concurrency"`
-	RequestTimeout int                         `json:"client_request_timeout"`
+	IndexNameDefault string                      `json:"index_name"`
+	IndexNameCommits string                      `json:"index_name_commits"`
+	ProjectID        int64                       `json:"-"`
+	Permissions      *indexer.ProjectPermissions `json:"-"`
+	URL              []string                    `json:"url"`
+	AWS              bool                        `json:"aws"`
+	Region           string                      `json:"aws_region"`
+	AccessKey        string                      `json:"aws_access_key"`
+	SecretKey        string                      `json:"aws_secret_access_key"`
+	MaxBulkSize      int                         `json:"max_bulk_size_bytes"`
+	BulkWorkers      int                         `json:"max_bulk_concurrency"`
+	RequestTimeout   int                         `json:"client_request_timeout"`
 }
 
 func ReadConfig(r io.Reader) (*Config, error) {

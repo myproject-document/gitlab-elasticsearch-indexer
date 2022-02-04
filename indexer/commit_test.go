@@ -14,7 +14,39 @@ func TestBuildCommit(t *testing.T) {
 
 	expected := validCommit(gitCommit)
 
-	i, _, _ := setupIndexer()
+	i, _, _ := setupIndexer(false)
+	actual := i.BuildCommit(gitCommit)
+
+	require.Equal(t, expected, actual)
+
+	expectedJSON := `{
+		"sha"       : "` + expected.SHA + `",
+		"message"   : "` + expected.Message + `",
+		"author"    : {
+			"name": "` + expected.Author.Name + `",
+			"email": "` + expected.Author.Email + `",
+			"time": "` + indexer.GenerateDate(gitCommit.Author.When) + `"
+		},
+		"committer" : {
+			"name": "` + expected.Committer.Name + `",
+			"email": "` + expected.Committer.Email + `",
+			"time": "` + indexer.GenerateDate(gitCommit.Committer.When) + `"
+		},
+		"rid"       : "` + expected.RepoID + `",
+		"type"      : "commit"
+	}`
+
+	actualJSON, err := json.Marshal(actual)
+	require.NoError(t, err)
+	require.JSONEq(t, expectedJSON, string(actualJSON))
+}
+
+func TestBuildCommitForSeparateIndex(t *testing.T) {
+	gitCommit := gitCommit("Initial commit")
+
+	expected := validCommit(gitCommit)
+
+	i, _, _ := setupIndexer(true)
 	actual := i.BuildCommit(gitCommit)
 
 	require.Equal(t, expected, actual)
