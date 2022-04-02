@@ -14,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/deoxxa/aws_signing_client"
-	"github.com/olivere/elastic"
+	"github.com/olivere/elastic/v7"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 )
 
@@ -210,7 +210,6 @@ func (c *Client) indexNameFor(documentType string) string {
 func (c *Client) Index(documentType, id string, thing interface{}) {
 	req := elastic.NewBulkIndexRequest().
 		Index(c.indexNameFor(documentType)).
-		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
 		Doc(thing)
@@ -222,7 +221,6 @@ func (c *Client) Index(documentType, id string, thing interface{}) {
 func (c *Client) Get(documentType, id string) (*elastic.GetResult, error) {
 	return c.Client.Get().
 		Index(c.indexNameFor(documentType)).
-		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
 		Do(context.TODO())
@@ -239,7 +237,6 @@ func (c *Client) GetBlob(path string) (*elastic.GetResult, error) {
 func (c *Client) Remove(documentType, id string) {
 	req := elastic.NewBulkDeleteRequest().
 		Index(c.indexNameFor(documentType)).
-		Type("doc").
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id)
 

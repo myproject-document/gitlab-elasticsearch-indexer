@@ -287,7 +287,7 @@ func TestIndexingTranscodesToUTF8(t *testing.T) {
 			require.NoError(t, err)
 
 			blobDoc := &document{}
-			require.NoError(t, json.Unmarshal(*blob.Source, &blobDoc))
+			require.NoError(t, json.Unmarshal(blob.Source, &blobDoc))
 
 			require.Equal(t, tc.expected, blobDoc.Blob.Content)
 		})
@@ -319,12 +319,11 @@ func TestIndexingGitlabTest(t *testing.T) {
 	commit, err := c.GetCommit(headSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
-	require.Equal(t, "doc", commit.Type)
 	require.Equal(t, projectIDString+"_"+headSHA, commit.Id)
 	require.Equal(t, "project_"+projectIDString, commit.Routing)
 
 	data := make(map[string]interface{})
-	require.NoError(t, json.Unmarshal(*commit.Source, &data))
+	require.NoError(t, json.Unmarshal(commit.Source, &data))
 
 	commitDoc, ok := data["commit"]
 	require.True(t, ok)
@@ -357,12 +356,11 @@ func TestIndexingGitlabTest(t *testing.T) {
 	blob, err := c.GetBlob("README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
-	require.Equal(t, "doc", blob.Type)
 	require.Equal(t, projectIDString+"_README.md", blob.Id)
 	require.Equal(t, "project_"+projectIDString, blob.Routing)
 
 	data = make(map[string]interface{})
-	require.NoError(t, json.Unmarshal(*blob.Source, &data))
+	require.NoError(t, json.Unmarshal(blob.Source, &data))
 
 	blobDoc, ok := data["blob"]
 	require.True(t, ok)
@@ -393,7 +391,7 @@ func TestIndexingGitlabTest(t *testing.T) {
 	require.NoError(t, err)
 
 	cDoc := &document{}
-	require.NoError(t, json.Unmarshal(*commit.Source, &cDoc))
+	require.NoError(t, json.Unmarshal(commit.Source, &cDoc))
 
 	date, err = time.Parse("20060102T150405-0700", "20160921T181326+0300")
 	require.NoError(t, err)
@@ -416,12 +414,11 @@ func TestIndexingCommits(t *testing.T) {
 	commit, err := c.GetCommit(headSHA)
 	require.NoError(t, err)
 	require.True(t, commit.Found)
-	require.Equal(t, "doc", commit.Type)
 	require.Equal(t, projectIDString+"_"+headSHA, commit.Id)
 	require.Equal(t, "project_"+projectIDString, commit.Routing)
 
 	commitDoc := make(map[string]interface{})
-	require.NoError(t, json.Unmarshal(*commit.Source, &commitDoc))
+	require.NoError(t, json.Unmarshal(commit.Source, &commitDoc))
 
 	date, err := time.Parse("20060102T150405-0700", "20160927T143746+0000")
 	require.NoError(t, err)
@@ -466,12 +463,11 @@ func TestIndexingWikiBlobs(t *testing.T) {
 	blob, err := c.GetBlob("README.md")
 	require.NoError(t, err)
 	require.True(t, blob.Found)
-	require.Equal(t, "doc", blob.Type)
 	require.Equal(t, projectIDString+"_README.md", blob.Id)
 	require.Equal(t, "project_"+projectIDString, blob.Routing)
 
 	data := make(map[string]interface{})
-	require.NoError(t, json.Unmarshal(*blob.Source, &data))
+	require.NoError(t, json.Unmarshal(blob.Source, &data))
 
 	blobDoc, ok := data["blob"]
 	require.True(t, ok)

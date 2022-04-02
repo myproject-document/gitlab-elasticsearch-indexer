@@ -41,17 +41,6 @@ include:
     - make
     - make test
 
-.test-es6:
-  extends: .test-default
-  services:
-    - name: elasticsearch:6.8.15
-      command: ["elasticsearch", "-E", "discovery.type=single-node"]
-      alias: elasticsearch
-    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:master
-      # Disable the hooks so we don't have to stub the GitLab API
-      command: ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && exec /usr/bin/env GITALY_TESTING_NO_GIT_HOOKS=1 /scripts/process-wrapper"]
-      alias: gitaly
-
 .test-es7:
   extends: .test-default
   services:
@@ -64,18 +53,10 @@ include:
       alias: gitaly
 
 test 1.16:
-  extends: .test-es6
-  image: golang:1.16
-
-test 1.16-es7:
   extends: .test-es7
   image: golang:1.16
 
 test 1.17:
-  extends: .test-es6
-  image: golang:1.17
-
-test 1.17-es7:
   extends: .test-es7
   image: golang:1.17
 

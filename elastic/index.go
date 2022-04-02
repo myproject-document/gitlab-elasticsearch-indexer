@@ -95,7 +95,7 @@ const defaultIndexMapping = `
 		}
 	},
 	"mappings": {
-		"doc": {
+		"_doc": {
 			"dynamic": "strict",
 			"_routing": {
 				"required": true
