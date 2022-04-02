@@ -59,7 +59,7 @@ func initTestServer(expireOn string, failAssume bool, provideToken bool) *httpte
 			} else {
 				fmt.Fprintf(w, credsRespTmpl, expireOn)
 			}
-		case "/gitlab-index-test/doc/667":
+		case "/gitlab-index-test/_doc/667":
 			time.Sleep(3 * time.Second)
 			fmt.Fprintln(w, "{}")
 		case "/latest/api/token":
