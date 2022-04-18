@@ -57,7 +57,7 @@ tests-es7:
   image: golang:${GO_VERSION}
   parallel:
     matrix:
-      - GO_VERSION: ["1.16", "1.17", "1.18"]
+      - GO_VERSION: ["1.17", "1.18"]
 
 lint:go-mod:
   image: golang:1.17
