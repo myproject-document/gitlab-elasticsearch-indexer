@@ -81,7 +81,7 @@ lint:golangci:
     - golangci-lint run -v --disable-all -E errcheck -E deadcode -E ineffassign -E structcheck -E typecheck -E varcheck
 
 code_navigation:
-  image: sourcegraph/lsif-go:v1
+  image: sourcegraph/lsif-go:v1.2
   allow_failure: true
   script:
     - apt-get update && apt-get -yy install libicu-dev
