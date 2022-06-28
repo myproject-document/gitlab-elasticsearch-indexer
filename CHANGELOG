@@ -1,5 +1,16 @@
 # GitLab Elasticsearch Indexer
 
+## v3.0.1
+
+- build: bump go to 1.17.9 for asdf users !151
+- Pin dev go version to 1.17.8 !149
+
+## v3.0.0
+
+- Update ES client, remove document types !147
+- Write commit documents to new index !143
+- Pin dev go version by using .tool-versions !145
+
 ## v2.17.0
 
 - Fix usage of out-of-date Gitaly version !133
