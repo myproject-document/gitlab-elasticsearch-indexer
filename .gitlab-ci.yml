@@ -15,6 +15,9 @@ include:
   - template: Security/Dependency-Scanning.gitlab-ci.yml
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
+  - project: 'gitlab-org/quality/pipeline-common'
+    file:
+      - '/ci/danger-review.yml'
 
 .go-cache:
   variables:
@@ -89,7 +92,7 @@ code_navigation:
     reports:
       lsif: dump.lsif
 
-gosec-sast:  
+gosec-sast:
   rules: *workflow_rules
 
 gemnasium-dependency_scanning:
@@ -97,3 +100,8 @@ gemnasium-dependency_scanning:
 
 secret_detection:
   rules: *workflow_rules
+
+danger-review:
+  before_script:
+    - bundle init
+    - bundle add gitlab-dangerfiles
