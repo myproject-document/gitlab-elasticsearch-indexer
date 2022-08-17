@@ -4,11 +4,18 @@
 
 GitLab Elasticsearch Indexer has the following maintainers:
 
-- Nick Thomas `@nick.thomas`
 - Dylan Griffith `@DylanGriffith`
 - Dmitry Gruzd `@dgruzd`
+- Terri Chu `@terrichu`
 
 This list is defined at https://about.gitlab.com/team/
+
+### How to become a maintainer
+
+GitLab Elasticsearch Indexer follows a maintainership process based on the [smaller project
+template](https://about.gitlab.com/handbook/engineering/workflow/code-review/#maintainership-process-for-smaller-projects). 
+
+Anyone may nominate themselves as a trainee by opening a tracking issue using the [`gitlab-elasticsearch-indexer` trainee maintainer template](https://gitlab.com/gitlab-com/www-gitlab-com/-/issues/new?issuable_template=trainee-gitlab-elasticsearch-indexer-maintainer&issue[title]=gitlab-elasticsearch-indexer%20Trainee%20Maintainer%3A%20%5BFull%20Name%5D). It's normally a good idea to check with at least one maintainer or your manager before creating the issue, but it's not required.
 
 ## Merging and reviewing contributions
 
