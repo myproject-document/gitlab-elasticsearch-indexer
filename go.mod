@@ -7,7 +7,6 @@ require (
 	github.com/deoxxa/aws_signing_client v0.0.0-20161109131055-c20ee106809e
 	github.com/go-enry/go-enry/v2 v2.7.1
 	github.com/olivere/elastic/v7 v7.0.31
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	gitlab.com/gitlab-org/gitaly/v14 v14.4.2
 	gitlab.com/gitlab-org/labkit v1.16.0
@@ -39,6 +38,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sebest/xff v0.0.0-20210106013422-671bd2870b3a // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/text v0.3.7 // indirect
