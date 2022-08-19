@@ -300,10 +300,10 @@ func TestElasticClientIndexMismatch(t *testing.T) {
 	_, td := buildBrokenIndex(t)
 	defer td()
 
-	err, _, stderr := run("", headSHA)
+	err, stdout, _ := run("", headSHA)
 
 	require.Error(t, err)
-	require.Regexp(t, `bulk request \d: failed to insert \d/\d documents`, stderr)
+	require.Regexp(t, `Bulk request failed to insert \d/\d documents`, stdout)
 }
 
 func TestIndexingGitlabTest(t *testing.T) {
