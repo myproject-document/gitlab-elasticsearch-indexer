@@ -2,7 +2,6 @@ package elastic
 
 import (
 	"context"
-	"strconv"
 	"strings"
 )
 
@@ -22,8 +21,8 @@ const defaultIndexMapping = `
 					"preserve_original": "true",
 					"patterns": "(\\w+)"
 				},
-				"edgeNGram_filter": {
-					"type": "edgeNGram",
+				"edge_ngram_filter": {
+					"type": "edge_ngram",
 					"min_gram": "2",
 					"max_gram": "40"
 				}
@@ -57,7 +56,7 @@ const defaultIndexMapping = `
 						"code",
 						"lowercase",
 						"asciifolding",
-						"edgeNGram_filter"
+						"edge_ngram_filter"
 					],
 					"type": "custom",
 					"tokenizer": "whitespace"
@@ -76,7 +75,7 @@ const defaultIndexMapping = `
 						"digit"
 					],
 					"min_gram": "2",
-					"type": "nGram",
+					"type": "ngram",
 					"max_gram": "3"
 				},
 				"path_tokenizer": {
@@ -95,13 +94,11 @@ const defaultIndexMapping = `
 		}
 	},
 	"mappings": {
-		"_doc": {
-			"dynamic": "strict",
-			"_routing": {
-				"required": true
-			},
-			"properties": __PROPERTIES__
-		}
+		"dynamic": "strict",
+		"_routing": {
+			"required": true
+		},
+		"properties": __PROPERTIES__
 	}
 }`
 
@@ -422,29 +419,7 @@ const commitsIndexProperties = `
 
 // createIndex creates an index matching that created by GitLab
 func (c *Client) createIndex(indexName, mapping string) error {
-	info, err := c.Client.NodesInfo().Do(context.Background())
-	if err != nil {
-		return err
-	}
-
 	createIndexService := c.Client.CreateIndex(indexName).BodyString(mapping)
-
-	for _, node := range info.Nodes {
-		// Grab the first character of the version string and turn it into an int
-		version, _ := strconv.Atoi(string(node.Version[0]))
-		if version == 7 {
-			// include_type_name defaults to false in ES7. This will ensure ES7
-			// behaves like ES6 when creating mappings. See
-			// https://www.elastic.co/blog/moving-from-types-to-typeless-apis-in-elasticsearch-7-0
-			// for more information. We also can't set this for any versions before
-			// 6.8 as this parameter was not supported. Since it defaults to true in
-			// all 6.x it's safe to only set it for 7.x.
-			createIndexService = createIndexService.IncludeTypeName(true)
-		}
-
-		// We only look at the first node and assume they're all the same version
-		break
-	}
 
 	createIndex, err := createIndexService.Do(context.Background())
 	if err != nil {
