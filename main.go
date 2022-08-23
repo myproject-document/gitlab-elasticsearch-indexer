@@ -140,16 +140,21 @@ func main() {
 func configureLogger() (io.Closer, error) {
 	_, debug := os.LookupEnv("DEBUG")
 
-	var level string
-	level = "info"
+	level := "info"
 	if debug {
 		level = "debug"
+	}
+
+	logPath, logPathExists := os.LookupEnv("INDEXER_LOG")
+	outputName := "stdout"
+	if logPathExists {
+		outputName = logPath
 	}
 
 	return logkit.Initialize(
 		logkit.WithLogLevel(level),
 		logkit.WithFormatter("json"),
-		logkit.WithOutputName("stdout"),
+		logkit.WithOutputName(outputName),
 	)
 }
 
