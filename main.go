@@ -147,7 +147,7 @@ func configureLogger() (io.Closer, error) {
 
 	return logkit.Initialize(
 		logkit.WithLogLevel(level),
-		logkit.WithFormatter("text"),
+		logkit.WithFormatter("json"),
 		logkit.WithOutputName("stdout"),
 	)
 }
