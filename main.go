@@ -53,7 +53,7 @@ func main() {
 
 	if len(args) != 2 {
 		error := errors.New("WrongArguments")
-		logkit.WithError(error).Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
+		logkit.WithError(error).Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=project-path] [--timeout=timeout] [--visbility-level=visbility-level] [--repository-access-level=repository-access-level] project-id repository-path ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
