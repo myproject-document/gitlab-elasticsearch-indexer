@@ -44,6 +44,26 @@ include:
     - make
     - make test
 
+.test-es8:
+  extends: .test-default
+  services:
+    - name: elasticsearch:8.3.3
+      alias: elasticsearch
+    - name: registry.gitlab.com/gitlab-org/build/cng/gitaly:master
+      # Disable the hooks so we don't have to stub the GitLab API
+      command: ["bash", "-c", "mkdir -p /home/git/repositories && rm -rf /srv/gitlab-shell/hooks/* && exec /usr/bin/env GITALY_TESTING_NO_GIT_HOOKS=1 /scripts/process-wrapper"]
+      alias: gitaly
+  variables:
+    ES_SETTING_DISCOVERY_TYPE: "single-node"
+    ES_SETTING_XPACK_SECURITY_ENABLED: "false"
+
+tests-es8:
+  extends: .test-es8
+  image: golang:${GO_VERSION}
+  parallel:
+    matrix:
+      - GO_VERSION: ["1.17", "1.18"]
+
 .test-es7:
   extends: .test-default
   services:
