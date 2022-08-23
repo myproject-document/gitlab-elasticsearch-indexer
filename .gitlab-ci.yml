@@ -107,7 +107,7 @@ code_navigation:
   allow_failure: true
   script:
     - apt-get update && apt-get -yy install libicu-dev
-    - lsif-go
+    - go mod download && lsif-go
   artifacts:
     reports:
       lsif: dump.lsif
