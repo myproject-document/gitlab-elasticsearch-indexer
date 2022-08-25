@@ -2,7 +2,8 @@ package indexer
 
 import (
 	"fmt"
-	"log"
+
+	logkit "gitlab.com/gitlab-org/labkit/log"
 
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 )
@@ -128,12 +129,12 @@ func (i *Indexer) IndexBlobs(blobType string) error {
 		return i.indexWikiBlobs()
 	}
 
-	return fmt.Errorf("Unknown blob type: %v", blobType)
+	return fmt.Errorf("unknown blob type: %v", blobType)
 }
 
 func (i *Indexer) IndexCommits() error {
 	if err := i.indexCommits(); err != nil {
-		log.Print("Error while indexing commits: ", err)
+		logkit.WithError(err).Error("error while indexing commits")
 		return err
 	}
 

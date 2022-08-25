@@ -7,19 +7,19 @@ require (
 	github.com/deoxxa/aws_signing_client v0.0.0-20161109131055-c20ee106809e
 	github.com/go-enry/go-enry/v2 v2.7.1
 	github.com/olivere/elastic/v7 v7.0.31
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	gitlab.com/gitlab-org/gitaly/v14 v14.4.2
 	gitlab.com/gitlab-org/labkit v1.16.0
 	gitlab.com/lupine/icu v1.0.0
 	golang.org/x/net v0.0.0-20211209124913-491a49abca63
 	golang.org/x/tools v0.1.5
-	google.golang.org/grpc v1.40.0
+	google.golang.org/grpc v1.48.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/client9/reopen v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-enry/go-oniguruma v1.2.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -38,6 +38,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sebest/xff v0.0.0-20210106013422-671bd2870b3a // indirect
+	github.com/sirupsen/logrus v1.8.1 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
 	golang.org/x/text v0.3.7 // indirect

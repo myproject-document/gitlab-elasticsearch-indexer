@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
+	logkit "gitlab.com/gitlab-org/labkit/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -186,7 +186,12 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 			switch change.Operation.String() {
 			case "DELETED", "RENAMED":
 				path := string(change.OldPathBytes)
-				log.Debug("Indexing blob change: ", "DELETE", path)
+				logkit.WithFields(
+					logkit.Fields{
+						"operation": "DELETE",
+						"path":      path,
+					},
+				).Debug("Indexing blob change")
 				if err = del(path); err != nil {
 					return err
 				}
@@ -198,7 +203,12 @@ func (gc *gitalyClient) EachFileChange(put PutFunc, del DelFunc) error {
 				if err != nil {
 					return err
 				}
-				log.Debug("Indexing blob change: ", "PUT", file.Path)
+				logkit.WithFields(
+					logkit.Fields{
+						"operation": "PUT",
+						"path":      file.Path,
+					},
+				).Debug("Indexing blob change")
 				if err = put(file, gc.FromHash, gc.ToHash); err != nil {
 					return err
 				}
@@ -330,7 +340,7 @@ func (gc *gitalyClient) EachCommit(f CommitFunc) error {
 				Committer: gitalyBuildSignature(cmt.Committer),
 			}
 
-			log.Debug("Indexing commit: ", cmt.Id)
+			logkit.WithField("commitID", cmt.Id).Debug("Indexing commit")
 
 			if err := f(commit); err != nil {
 				return err

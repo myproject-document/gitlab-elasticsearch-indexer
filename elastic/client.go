@@ -3,11 +3,13 @@ package elastic
 import (
 	"context"
 	"fmt"
-	"log"
+
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	logkit "gitlab.com/gitlab-org/labkit/log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -64,9 +66,18 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 		c.bulkFailed = true
 
 		if elastic.IsStatusCode(err, http.StatusRequestEntityTooLarge) {
-			log.Printf("bulk request %d: error: %v, max bulk size setting (GitLab): %d bytes. Consider lowering maximum bulk request size or/and increasing http.max_content_length", executionId, err, c.maxBulkSize)
+			logkit.WithFields(
+				logkit.Fields{
+					"bulkRequestId":      executionId,
+					"maxBulkSizeSetting": c.maxBulkSize,
+				},
+			).WithError(err).Error("Consider lowering maximum bulk request size or/and increasing http.max_content_length")
 		} else {
-			log.Printf("bulk request %d: error: %v", executionId, err)
+			logkit.WithFields(
+				logkit.Fields{
+					"bulkRequestId": executionId,
+				},
+			).WithError(err).Error("Bulk request failed")
 		}
 	}
 
@@ -78,7 +89,7 @@ func (c *Client) afterCallback(executionId int64, requests []elastic.BulkableReq
 			c.bulkFailed = true
 			total := numFailed + len(response.Succeeded())
 
-			log.Printf("bulk request %d: failed to insert %d/%d documents ", executionId, numFailed, total)
+			logkit.WithField("bulkRequestId", executionId).Errorf("Bulk request failed to insert %d/%d documents", numFailed, total)
 		}
 	}
 }
