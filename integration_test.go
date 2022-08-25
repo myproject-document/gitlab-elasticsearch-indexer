@@ -233,7 +233,7 @@ func TestIndexingTimeout(t *testing.T) {
 	err, stdout, _ := run("", "e2c7507b72f55cc272bbd5fde5bfa46eb4aeeebf", "--timeout=0s")
 
 	require.Error(t, err)
-	require.Regexp(t, `The process has timed out after 0s`, stdout)
+	require.Regexp(t, `The process has timed out`, stdout)
 
 	err, stdout, _ = run("", "e2c7507b72f55cc272bbd5fde5bfa46eb4aeeebf", "--timeout=100")
 
@@ -300,10 +300,10 @@ func TestElasticClientIndexMismatch(t *testing.T) {
 	_, td := buildBrokenIndex(t)
 	defer td()
 
-	err, _, stderr := run("", headSHA)
+	err, stdout, _ := run("", headSHA)
 
 	require.Error(t, err)
-	require.Regexp(t, `bulk request \d: failed to insert \d/\d documents`, stderr)
+	require.Regexp(t, `Bulk request failed to insert \d/\d documents`, stdout)
 }
 
 func TestIndexingGitlabTest(t *testing.T) {

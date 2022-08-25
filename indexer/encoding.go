@@ -2,7 +2,8 @@ package indexer
 
 import (
 	"fmt"
-	"log"
+
+	logkit "gitlab.com/gitlab-org/labkit/log"
 
 	"gitlab.com/lupine/icu"
 )
@@ -28,7 +29,7 @@ func NewEncoder(limitFileSize int64) *Encoder {
 func (e *Encoder) tryEncodeString(s string) string {
 	encoded, err := e.encodeString(s)
 	if err != nil {
-		log.Println(err)
+		logkit.WithError(err).Error("Encode string failed")
 		return s // TODO: Run it through the UTF-8 replacement encoder
 	}
 
@@ -38,7 +39,7 @@ func (e *Encoder) tryEncodeString(s string) string {
 func (e *Encoder) tryEncodeBytes(b []byte) string {
 	encoded, err := e.encodeBytes(b)
 	if err != nil {
-		log.Println(err)
+		logkit.WithError(err).Error("Encode bytes failed")
 		s := string(b)
 		return s // TODO: Run it through the UTF-8 replacement encoder
 	}

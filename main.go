@@ -1,16 +1,20 @@
 package main
 
 import (
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"os"
+
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/git"
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/indexer"
 	"gitlab.com/gitlab-org/labkit/correlation"
+	logkit "gitlab.com/gitlab-org/labkit/log"
 )
 
 var (
@@ -31,23 +35,30 @@ var (
 )
 
 func main() {
+	closer, err := configureLogger()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error initializing logkit %v", err)
+		os.Exit(1)
+	}
+	defer closer.Close()
+
 	flag.Parse()
 
 	if *versionFlag {
-		log.Printf("%s %s (built at: %s)", os.Args[0], Version, BuildTime)
+		fmt.Fprintf(os.Stdout, "%s %s (built at: %s)", os.Args[0], Version, BuildTime)
 		os.Exit(0)
 	}
 
-	configureLogger()
 	args := flag.Args()
 
 	if len(args) != 2 {
-		log.Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
+		error := errors.New("WrongArguments")
+		logkit.WithError(error).Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
 	if err != nil {
-		log.Fatal(err)
+		logkit.WithError(err).WithField("projectID", args[0]).Fatalf("Error parsing projectID")
 	}
 
 	repoPath := args[1]
@@ -62,67 +73,91 @@ func main() {
 
 	repo, err := git.NewGitalyClientFromEnv(repoPath, fromSHA, toSHA, correlationID, args[0], projectPath)
 	if err != nil {
-		log.Fatal(err)
+		logkit.WithFields(
+			logkit.Fields{
+				"repoPath":      repoPath,
+				"fromSHA":       fromSHA,
+				"toSHA":         toSHA,
+				"correlationID": correlationID,
+				"projectID":     args[0],
+				"projectPath":   projectPath,
+			},
+		).WithError(err).Fatal("Error creating gitaly client")
 	}
 
-	config := loadConfig(projectID)
+	config, err := loadConfig(projectID)
+	if err != nil {
+		logkit.WithError(err).WithField("projectID", projectID).Fatalf("Error loading config")
+	}
 
 	esClient, err := elastic.NewClient(config, correlationID)
 	if err != nil {
-		log.Fatal(err)
+		logkit.WithError(err).Fatal("Error creating elastic client")
 	}
 
 	if timeoutOption != "" {
 		timeout, err := time.ParseDuration(timeoutOption)
 		if err != nil {
-			log.Fatal(err)
+			logkit.WithError(err).WithField("timeoutOption", timeoutOption).Fatalf("Error parsing timeout")
 		} else {
-			log.Infof("Setting timeout to %s", timeout)
+			logkit.WithField("timeout", timeout).Info("Setting timeout")
 
 			time.AfterFunc(timeout, func() {
-				log.Fatalf("The process has timed out after %s", timeout)
+				error := errors.New("TimedOut")
+				logkit.WithError(error).WithField("timeout", timeout).Fatalf("The process has timed out")
 			})
 		}
 	}
 
 	idx := indexer.NewIndexer(repo, esClient)
 
-	log.Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
-	log.Debugf("Default Index Name: %s, Commits Index Name: %s, Project ID: %v, blob_type: %s, skip_commits?: %t, Permissions: %v", esClient.IndexNameDefault, esClient.IndexNameCommits, esClient.ParentID(), blobType, skipCommits, Permissions)
+	logkit.WithFields(
+		logkit.Fields{
+			"IndexNameDefault": esClient.IndexNameDefault,
+			"IndexNameCommits": esClient.IndexNameCommits,
+			"projectID":        esClient.ParentID(),
+			"blobType":         blobType,
+			"skipCommits":      skipCommits,
+			"Permissions":      config.Permissions,
+		},
+	).Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
 
 	if err := idx.IndexBlobs(blobType); err != nil {
-		log.Fatalln("Indexing error: ", err)
+		logkit.WithError(err).Fatalln("Indexing error")
 	}
 
 	if !skipCommits && blobType == "blob" {
 		if err := idx.IndexCommits(); err != nil {
-			log.Fatalln("Indexing error: ", err)
+			logkit.WithError(err).Fatalln("Indexing error")
 		}
 	}
 
 	if err := idx.Flush(); err != nil {
-		log.Fatalln("Flushing error: ", err)
+		logkit.WithError(err).Fatalln("Flushing error")
 	}
 }
 
-func configureLogger() {
-	log.SetOutput(os.Stdout)
+func configureLogger() (io.Closer, error) {
 	_, debug := os.LookupEnv("DEBUG")
 
+	level := "info"
 	if debug {
-		log.SetLevel(log.DebugLevel)
+		level = "debug"
 	}
+
+	return logkit.Initialize(
+		logkit.WithLogLevel(level),
+		logkit.WithFormatter("text"),
+		logkit.WithOutputName("stdout"),
+	)
 }
 
-func loadConfig(projectID int64) *elastic.Config {
+func loadConfig(projectID int64) (*elastic.Config, error) {
 	config, err := elastic.ConfigFromEnv()
-	if err != nil {
-		log.Fatal(err)
-	}
 	config.Permissions = generateProjectPermissions()
 	config.ProjectID = projectID
 
-	return config
+	return config, err
 }
 
 func generateCorrelationID() string {
@@ -133,7 +168,7 @@ func generateCorrelationID() string {
 		if cid, err = correlation.RandomID(); err != nil {
 			// Should never happen since correlation.RandomID() should not fail,
 			// but if it does we return empty string, which is fine.
-			log.Error("Unable to generate random correlation ID: ", err)
+			logkit.WithError(err).Error("Unable to generate random correlation ID")
 		}
 	}
 
