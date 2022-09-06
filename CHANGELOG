@@ -1,5 +1,10 @@
 # GitLab Elasticsearch Indexer
 
+## v3.0.2
+
+- Update dependencies !155
+- Change to use labkit logger !156
+
 ## v3.0.1
 
 - build: bump go to 1.17.9 for asdf users !151
