@@ -16,10 +16,9 @@ const defaultIndexMapping = `
 					"name": "light_english",
 					"type": "stemmer"
 				},
-				"code": {
-					"type": "pattern_capture",
-					"preserve_original": "true",
-					"patterns": "(\\w+)"
+				"word_delimiter_graph_filter": {
+					"type": "word_delimiter_graph",
+					"preserve_original": "true"
 				},
 				"edge_ngram_filter": {
 					"type": "edge_ngram",
@@ -35,14 +34,6 @@ const defaultIndexMapping = `
 					],
 					"tokenizer": "standard"
 				},
-				"code_search_analyzer": {
-					"filter": [
-						"lowercase",
-						"asciifolding"
-					],
-					"type": "custom",
-					"tokenizer": "whitespace"
-				},
 				"path_analyzer": {
 					"filter": [
 						"lowercase",
@@ -53,7 +44,8 @@ const defaultIndexMapping = `
 				},
 				"code_analyzer": {
 					"filter": [
-						"code",
+						"word_delimiter_graph_filter",
+						"flatten_graph",
 						"lowercase",
 						"asciifolding",
 						"edge_ngram_filter"
@@ -123,12 +115,10 @@ const defaultIndexProperties = `
 			"content": {
 				"analyzer": "code_analyzer",
 				"index_options": "positions",
-				"search_analyzer": "code_search_analyzer",
 				"type": "text"
 			},
 			"file_name": {
 				"analyzer": "code_analyzer",
-				"search_analyzer": "code_search_analyzer",
 				"type": "text"
 			},
 			"id": {
