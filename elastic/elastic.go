@@ -27,7 +27,7 @@ type Config struct {
 	MaxBulkSize      int                         `json:"max_bulk_size_bytes"`
 	BulkWorkers      int                         `json:"max_bulk_concurrency"`
 	RequestTimeout   int                         `json:"client_request_timeout"`
-	SearchCuration   bool                        `json:"rollover_delete"`
+	SearchCuration   bool                        `json:"search_curation"`
 }
 
 func ReadConfig(r io.Reader) (*Config, error) {
