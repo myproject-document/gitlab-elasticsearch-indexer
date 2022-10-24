@@ -33,6 +33,7 @@ type Client struct {
 	Client           *elastic.Client
 	bulk             *elastic.BulkProcessor
 	bulkFailed       bool
+	SearchCuration   bool
 }
 
 // ConfigFromEnv creates a Config from the `ELASTIC_CONNECTION_INFO`
@@ -148,6 +149,7 @@ func NewClient(config *Config, correlationID string) (*Client, error) {
 		ProjectID:        config.ProjectID,
 		Permissions:      config.Permissions,
 		maxBulkSize:      config.MaxBulkSize,
+		SearchCuration:   config.SearchCuration,
 		Client:           client,
 	}
 
@@ -219,13 +221,63 @@ func (c *Client) indexNameFor(documentType string) string {
 }
 
 func (c *Client) Index(documentType, id string, thing interface{}) {
+	indexName := c.indexNameFor(documentType)
 	req := elastic.NewBulkIndexRequest().
-		Index(c.indexNameFor(documentType)).
+		Index(indexName).
 		Routing(fmt.Sprintf("project_%v", c.ProjectID)).
 		Id(id).
 		Doc(thing)
 
+	if c.SearchCuration {
+		c.DeleteFromRolledOverIndices(&RolloverParams{
+			AliasName: indexName,
+			DocType:   documentType,
+			DocId:     id,
+		})
+	}
+
 	c.bulk.Add(req)
+}
+
+type RolloverParams struct {
+	AliasName string
+	DocType   string
+	DocId     string
+}
+
+func (c *Client) DeleteFromRolledOverIndices(params *RolloverParams) error {
+	res, err := c.Client.Aliases().
+		Index(params.AliasName).
+		Pretty(true).
+		Do(context.TODO())
+
+	if err != nil {
+		return err
+	}
+
+	for indexName, indexDetails := range res.Indices {
+		// There are no rolled over indices yet
+		if len(indexDetails.Aliases) <= 1 {
+			continue
+		}
+
+		for _, aliasInfo := range indexDetails.Aliases {
+			if aliasInfo.AliasName != params.AliasName || aliasInfo.IsWriteIndex {
+				continue
+			}
+
+			// fmt.Println("DELETE from indexName", indexName, params.DocId)
+			logkit.WithFields(
+				logkit.Fields{
+					"rollover_delete": indexName,
+					"doc_id":          params.DocId,
+				},
+			).Infof("Deleting document from rollover index %s to %s", indexName, params.DocId)
+			c.Remove(params.DocType, params.DocId)
+		}
+	}
+
+	return nil
 }
 
 // We only really use this for tests

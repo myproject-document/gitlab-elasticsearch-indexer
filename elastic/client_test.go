@@ -273,6 +273,17 @@ func setupTestClientAndCreateIndex(t *testing.T) *elastic.Client {
 	return client
 }
 
+func TestDeleteFromRolledOverIndices(t *testing.T) {
+	client := setupTestClient(t)
+	params := &elastic.RolloverParams{
+		AliasName: "gitlab-development", // TODO create alias in setup
+		DocType:   "project",
+		DocId:     "123",
+	}
+
+	require.NoError(t, client.DeleteFromRolledOverIndices(params))
+}
+
 func TestElasticClientIndexAndRetrieval(t *testing.T) {
 	client := setupTestClientAndCreateIndex(t)
 

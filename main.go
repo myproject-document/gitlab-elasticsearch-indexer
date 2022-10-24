@@ -20,6 +20,7 @@ import (
 var (
 	versionFlag               = flag.Bool("version", false, "Print the version and exit")
 	skipCommitsFlag           = flag.Bool("skip-commits", false, "Skips indexing commits for the repo")
+	SearchCurationFlag        = flag.Bool("search-curation", false, "Enables deleting documents from rolled over indices")
 	blobTypeFlag              = flag.String("blob-type", "blob", "The type of blobs to index. Accepted values: 'blob', 'wiki_blob'")
 	visibilityLevelFlag       = flag.Int("visibility-level", -1, "Project visbility_access_level. Accepted values: 0, 10, 20")
 	repositoryAccessLevelFlag = flag.Int("repository-access-level", -1, "Project repository_access_level. Accepted values: 0, 10, 20")
@@ -53,7 +54,7 @@ func main() {
 
 	if len(args) != 2 {
 		error := errors.New("WrongArguments")
-		logkit.WithError(error).Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
+		logkit.WithError(error).Fatalf("Usage: %s [ --version | [--blob-type=(blob|wiki_blob)] [--skip-commits] [--search-curation] [--project-path=<project-path>] [--timeout=<timeout>] [--visbility-level=<visbility-level>] [--repository-access-level=<repository-access-level>] <project-id> <repo-path> ]", os.Args[0])
 	}
 
 	projectID, err := strconv.ParseInt(args[0], 10, 64)
@@ -67,6 +68,7 @@ func main() {
 	toSHA := os.Getenv("TO_SHA")
 	blobType := *blobTypeFlag
 	skipCommits := *skipCommitsFlag
+	SearchCuration := *SearchCurationFlag
 	projectPath := *projectPathFlag
 	timeoutOption := *timeoutOptionFlag
 	correlationID := generateCorrelationID()
@@ -89,6 +91,8 @@ func main() {
 	if err != nil {
 		logkit.WithError(err).WithField("projectID", projectID).Fatalf("Error loading config")
 	}
+
+	config.SearchCuration = SearchCuration
 
 	esClient, err := elastic.NewClient(config, correlationID)
 	if err != nil {
@@ -118,6 +122,7 @@ func main() {
 			"projectID":        esClient.ParentID(),
 			"blobType":         blobType,
 			"skipCommits":      skipCommits,
+			"SearchCurations":  SearchCuration,
 			"Permissions":      config.Permissions,
 		},
 	).Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
