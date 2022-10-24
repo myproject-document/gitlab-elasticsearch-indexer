@@ -122,7 +122,7 @@ func main() {
 			"projectID":        esClient.ParentID(),
 			"blobType":         blobType,
 			"skipCommits":      skipCommits,
-			"SearchCurations":  SearchCuration,
+			"SearchCuration":   SearchCuration,
 			"Permissions":      config.Permissions,
 		},
 	).Debugf("Indexing from %s to %s", repo.FromHash, repo.ToHash)
