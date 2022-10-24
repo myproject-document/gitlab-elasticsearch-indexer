@@ -266,13 +266,12 @@ func (c *Client) DeleteFromRolledOverIndices(params *RolloverParams) error {
 				continue
 			}
 
-			// fmt.Println("DELETE from indexName", indexName, params.DocId)
 			logkit.WithFields(
 				logkit.Fields{
 					"search_curation": indexName,
 					"doc_id":          params.DocId,
 				},
-			).Infof("Deleting document from rollover index %s to %s", indexName, params.DocId)
+			).Debugf("Deleting document from rollover index %s to %s", indexName, params.DocId)
 			c.Remove(params.DocType, params.DocId)
 		}
 	}
