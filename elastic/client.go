@@ -255,12 +255,12 @@ func (c *Client) DeleteFromRolledOverIndices(params *RolloverParams) error {
 		return err
 	}
 
-	for indexName, indexDetails := range res.Indices {
-		// There are no rolled over indices yet
-		if len(indexDetails.Aliases) <= 1 {
-			continue
-		}
+	// There are no rolled over indices yet
+	if len(res.Indices) <= 1 {
+		return nil
+	}
 
+	for indexName, indexDetails := range res.Indices {
 		for _, aliasInfo := range indexDetails.Aliases {
 			if aliasInfo.AliasName != params.AliasName || aliasInfo.IsWriteIndex {
 				continue
@@ -271,7 +271,7 @@ func (c *Client) DeleteFromRolledOverIndices(params *RolloverParams) error {
 					"search_curation": indexName,
 					"doc_id":          params.DocId,
 				},
-			).Debugf("Deleting document from rollover index %s to %s", indexName, params.DocId)
+			).Debugf("Deleting doc `%s` from rollover index %s", params.DocId, indexName)
 			c.Remove(params.DocType, params.DocId)
 		}
 	}

@@ -3,6 +3,8 @@ package elastic
 import (
 	"context"
 	"strings"
+
+	"github.com/olivere/elastic/v7"
 )
 
 // indexMapping is used as an example for testing purposes only and is
@@ -454,4 +456,35 @@ func (c *Client) DeleteIndex(indexName string) error {
 	}
 
 	return nil
+}
+
+type CreateAliasParams struct {
+	Index        string
+	Alias        string
+	IsWriteIndex bool
+}
+
+func (c *Client) CreateAlias(params *CreateAliasParams) error {
+	action := elastic.NewAliasAddAction(params.Alias).Index(params.Index).IsWriteIndex(params.IsWriteIndex)
+
+	if err := action.Validate(); err != nil {
+		return err
+	}
+
+	_, err := c.Client.Alias().Action(action).Do(context.TODO())
+
+	return err
+}
+
+type RemoveAliasParams struct {
+	Index string
+	Alias string
+}
+
+func (c *Client) RemoveAlias(params *RemoveAliasParams) error {
+	_, err := c.Client.Alias().
+		Remove(params.Index, params.Alias).
+		Do(context.TODO())
+
+	return err
 }

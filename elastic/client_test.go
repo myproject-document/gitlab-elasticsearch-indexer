@@ -3,6 +3,7 @@ package elastic_test
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,8 +15,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	E "github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/require"
-
 	"gitlab.com/gitlab-org/gitlab-elasticsearch-indexer/elastic"
 )
 
@@ -273,15 +274,77 @@ func setupTestClientAndCreateIndex(t *testing.T) *elastic.Client {
 	return client
 }
 
+func putTestAlias(t *testing.T, c *elastic.Client, params *elastic.CreateAliasParams) {
+	require.NoError(t, c.CreateAlias(params))
+}
+
+type testDoc struct {
+	ProjectId string `json:"project_id"`
+}
+
 func TestDeleteFromRolledOverIndices(t *testing.T) {
 	client := setupTestClient(t)
-	params := &elastic.RolloverParams{
-		AliasName: "gitlab-development", // TODO create alias in setup
-		DocType:   "project",
-		DocId:     "123",
+	client.SearchCuration = true
+
+	writeIndexName := client.IndexNameDefault
+	rolloverIndexName := "test-index-1"
+
+	aliasName := "test-alias"
+	docId := "1"
+	doc := &testDoc{ProjectId: fmt.Sprintf("%v", client.ParentID())}
+	r := fmt.Sprintf("project_%v", doc.ProjectId)
+
+	// index a doc in rollover index
+	if _, err := client.Client.Index().Index(rolloverIndexName).Routing(r).Id(docId).BodyJson(doc).Do(context.TODO()); err != nil {
+		t.Fatal(err)
 	}
 
-	require.NoError(t, client.DeleteFromRolledOverIndices(params))
+	// duplicate same doc in write index
+	if _, err := client.Client.Index().Index(writeIndexName).Routing(r).Id(docId).BodyJson(doc).Do(context.TODO()); err != nil {
+		t.Fatal(err)
+	}
+
+	// create write + read alias
+	putTestAlias(t, client, &elastic.CreateAliasParams{Index: writeIndexName, Alias: aliasName, IsWriteIndex: true})
+	putTestAlias(t, client, &elastic.CreateAliasParams{Index: rolloverIndexName, Alias: aliasName, IsWriteIndex: false})
+
+	// cleanup after test
+	defer require.NoError(t, client.DeleteIndex(writeIndexName))
+	defer require.NoError(t, client.DeleteIndex(rolloverIndexName))
+	defer require.NoError(t, client.RemoveAlias(&elastic.RemoveAliasParams{
+		Index: writeIndexName, Alias: aliasName,
+	}))
+	defer require.NoError(t, client.RemoveAlias(&elastic.RemoveAliasParams{
+		Index: rolloverIndexName, Alias: aliasName,
+	}))
+
+	require.NoError(t, client.DeleteFromRolledOverIndices(&elastic.RolloverParams{
+		AliasName: aliasName,
+		DocType:   "project",
+		DocId:     docId,
+	}))
+	require.NoError(t, client.Flush())
+
+	// refresh both indices
+	if _, err := client.Client.Refresh().Index(rolloverIndexName, writeIndexName).Do(context.TODO()); err != nil {
+		t.Fatal(err)
+	}
+
+	search, searchErr := client.Client.Search().Index(aliasName).Query(E.NewMatchAllQuery()).Do(context.TODO())
+	require.NoError(t, searchErr)
+
+	if search.TotalHits() != 1 {
+		t.Errorf("expected hits == 1; got %v", search.TotalHits())
+	}
+
+	var d testDoc
+	hit := search.Hits.Hits[0]
+
+	if err := json.Unmarshal(hit.Source, &d); err != nil {
+		t.Fatal(err) // serialization error
+	}
+
+	require.Equal(t, hit.Index, writeIndexName, "expected document to be in write index")
 }
 
 func TestElasticClientIndexAndRetrieval(t *testing.T) {
